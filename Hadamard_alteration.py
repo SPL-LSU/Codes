@@ -69,7 +69,7 @@ def hadamard_preprocessing(hada):
                 u1=tensor_fix(u1)
             i+=1
         check=u1*hada
-        if check.full()[0][0] < mag: #if there's a hadamard on that qubit, true
+        if check.full()[0][0] > mag: #if there's a hadamard on that qubit, true
             ongoing = False
         elif count == 20:
             break
