@@ -127,7 +127,8 @@ def dis(state1,state2):
         p_0 = 1/n + (n-1)*fid/n
     return p_0
 
-#messed up hadamard Allee coded most of this
+#altered Hadamard--changed from master
+#messed up global hadamard
 def multi_qubit_hadamard(regular_hadamard_gate):
     theta = uniform(0.0,math.pi*2.0)
     (n,n) = regular_hadamard_gate.shape
@@ -139,98 +140,80 @@ def multi_qubit_hadamard(regular_hadamard_gate):
     multi_qubit_hadamard = tensor_fix(multi_qubit_hadamard)    
     return multi_qubit_hadamard
 
-#She's figuring out the composition of the Hadamard
-def identifying_identities_and_hadamards(multi_qubit_hadamard):
-    (n,n) = multi_qubit_hadamard.shape
-    Q = np.log(n)/np.log(2)#Q is the number of qubits
-    multi_qubit_hadamard = multi_qubit_hadamard.full()
-    m = multi_qubit_hadamard.item(0) #m is the numberical value of cell from original array
-    m = m.real
-    H = np.log(m)/np.log(1/math.sqrt(2)) #H is the number of hadamrd gates applied
-    H = np.rint(H) # making H an integer incase of slight rounding errors
-    return Q,H
-
-#She's listing every decomposition possible of said Hadamard
-def combination_possibilities(Q,H):
-    all_possible = list(product('HI',repeat = int(Q)))
-    x=0
-    limited_possibilities = []
-    for ele in all_possible:
-        h = count_occurances(ele,'H')
-        h = int(h)
-        if h == H:
-            limited_possibilities.append(ele)
+#Looks awful, I promise it isn't. while loops are mostly security
+#Just figures out whether there's a hadamard present we can alter
+def hadamard_preprocessing(hada):
+    storage=hada.full()
+    (n,n)=hada.shape
+    q=np.log(n)/np.log(2) #number of qubits
+    seed=randint(0,q-1)
+    forbidden=[] #a vector to hold forbidden seeds
+    mag=storage[0][0] #magnitude of the elements in the hadamard
+    ongoing=True
+    while ongoing:
+        i=1
+        count=0
+        while seed in forbidden: #make sure the seed isn't forbidden
+            seed=randint(0,q-1)
+            count+=1
+            if count == 20: #no infinite loops
+                break
+        #initialize test unitary
+        if seed == 0:
+            u1=qt.hadamard_transform(1)
         else:
-            x = x+1 #this else is set up to that it can be used to debug if necessary
-    return limited_possibilities  
+            u1=id2
+        #create test unitary
+        while u1.shape != (n,n):
+            if i ==seed: #set a hadamard on specified qubit
+                u1=qt.tensor(u1,qt.hadamard_transform(1))
+                u1=tensor_fix(u1)
+            else:
+                u1=qt.tensor(u1,id2)
+                u1=tensor_fix(u1)
+            i+=1
+        check=u1*hada
+        if check.full()[0][0] > mag: #if there's a hadamard on that qubit, true
+            ongoing = False
+        elif count == 20:
+            print("oops")
+            break
+        else: #no hadamard on that seed qubit
+            forbidden.append(seed)
+    return hada,seed
 
-#Honestly not sure
-def count_occurances(ele, gate):
-    count = 0
-    for x in ele:
-        if (x == gate):
-            count = count +1
-    return count
-
-#Recombination part methinks?
-def tensor_elements_correctly(ele):
-    if ele[0] == 'H':
-        possible_array = qt.hadamard_transform(1)
-    elif ele[0] == 'I':
-        possible_array = qt.identity(2)
-        
-    for x in ele[1:len(ele)]:
-        if x == 'H':
-            possible_array = tensor_fix(qt.tensor(possible_array,qt.hadamard_transform(1)))
-        elif x == 'I':
-            possible_array = tensor_fix(qt.tensor(possible_array,qt.identity(2)))
-    return possible_array,ele
-    
-#????
-def combinations_to_arrays(limited_possibilities):
-    possible_arrays = []
-    array_of_combinations= []
-    for ele in limited_possibilities:
-        possible_array,ele = tensor_elements_correctly(ele)
-        possible_arrays.append(possible_array)
-        array_of_combinations.append(ele)
-    return possible_arrays,array_of_combinations
-
-def correct_combination(multi_qubit_hadamard,possible_arrays,array_of_combinations):
-    array_location = possible_arrays.index(multi_qubit_hadamard)
-    combination = array_of_combinations[array_location]
-    return combination
-
-#This is the part where she adds relative phase shift
-def hadamard_with_phase_shift():
+#can feed as input the preprocessing step
+def alter_hadamard(hada,seed):
+    (n,n)=hada.shape
     theta = uniform(0.0,math.pi*2.0)
-    shifted_hadamard = qt.globalphase(theta,1)*(qt.hadamard_transform(1))
-    return qt.Qobj(shifted_hadamard)
-
-#Generating the bad hadamard?
-def tensor_elements_incorrectly(combination):
-    if combination[0] == 'H':
-        altered_array = hadamard_with_phase_shift()
-    elif combination[0] == 'I':
-        altered_array = qt.identity(2)
+    
+    #pick a rotation any rotation
+    phaser=randint(0,3)
+    if phaser ==0:
+        gate=qt.phasegate(theta)
+    elif phaser == 1:
+        gate=qt.rz(theta)
+    elif phaser==2:
+        gate = qt.ry(theta)
+    else:
+        gate=qt.globalphase(theta)
         
-    for x in combination[1:len(combination)]:
-        if x == 'H':
-            altered_array = tensor_fix(qt.tensor(altered_array,hadamard_with_phase_shift()))
-        elif x == 'I':
-            altered_array = tensor_fix(qt.tensor(altered_array,qt.identity(2)))
-    altered_array= altered_array.full()
-    altered_array = altered_array.real
-    altered_array = qt.Qobj(altered_array)
-    return altered_array
-        
-def alter_multi_qubit_hadamard_specifically(multi_qubit_hadamard):
-    Q,H = identifying_identities_and_hadamards(multi_qubit_hadamard)
-    limited_possibilities = combination_possibilities(Q,H)
-    possible_arrays,array_of_combinations = combinations_to_arrays(limited_possibilities)
-    combination = correct_combination(multi_qubit_hadamard,possible_arrays,array_of_combinations)
-    altered_hadamard = tensor_elements_incorrectly(combination)
-    return altered_hadamard
+    #alter gate
+    if seed == 0:
+        u1=gate
+    else:
+        u1=id2
+    i=1
+    while u1.shape != (n,n):
+        if i ==seed: #set a alteration on specified qubit
+            u1=qt.tensor(u1,gate)
+            u1=tensor_fix(u1)
+        else:
+            u1=qt.tensor(u1,id2)
+            u1=tensor_fix(u1)
+        i+=1
+    final_gate=u1*hada
+    return final_gate
 
 #code which gives an original unitary gate
 def random_unitary_gate(delta,alpha,theta,beta,value):
@@ -406,43 +389,71 @@ def categorize(circuit):
         i+=2
     return(cat)
     
+#multiplies basic kets into high dimensions	
+def rabbit(qubits,choice,start):
+    basic_0ket=qt.Qobj([[1],[0]])
+    basic_1ket=qt.Qobj([[0],[1]])
+    if start ==1:
+        temp=basic_1ket
+    else:
+        temp=basic_0ket
+    r=1
+    while r < qubits:
+        if r in choice:
+            temp=qt.tensor(temp,basic_1ket)
+            temp=tensor_fix(temp)
+        else:
+            temp=qt.tensor(temp,basic_0ket)
+            temp=tensor_fix(temp)
+        r+=1
+    return temp
+	
 #Generates the input qubit vectors
+#also heavily changed
 def gen_basis_vectors(n,dims,choice):
     vectors=[]
     fock_states=[]
     bits=int(math.log(n,2))
-    for i in range(n):
-        state=qt.basis(n,i)
-        fock_states.append(state)
-    test_opt1=[fock_states[0],fock_states[0]+fock_states[1],fock_states[-1]+fock_states[0],fock_states[-2]+fock_states[1]]
-    test_opt2=[fock_states[0],fock_states[0]+fock_states[1],fock_states[-1]+fock_states[0]+fock_states[1],fock_states[-2]+fock_states[1]+fock_states[0]+fock_states[-1]]
-    if choice == 1: #Basis states
-        vectors = fock_states
+    q=rabbit(bits,[],0)
+    basic_states.append(q)
+    q=rabbit(bits,[1],0)
+    basic_states.append(q)
+    q=rabbit(bits,[n-1],0)
+    basic_states.append(q)
+    indexvec=[]
+    for i in range(bits):
+        indexvec.append(i)
+    q=rabbit(bits,indexvec,1)
+    basic_states.append(q)
+    if choice == 1: #Unused psuedo-Basis states
+        vectors = basis_states
         q=qt.Qobj(np.ones(n))
         q=q.unit()
         vectors.append(q)
-        vectors.append(state) #there is no two for now
+        vectors.append(state) 
+    elif choice ==2: #true basis states
+        vectors=basic_states
     elif choice == 3: #Hadamard option 1
         h=tensor_fix(qt.hadamard_transform(bits))
-        for state in test_opt1:
+        for state in basic_states:
             state_n=h*state
             state_n=state_n.unit()
             vectors.append(state_n)
     elif choice == 4: #QFT option 1
         quft=tensor_fix(qft.qft(bits))
-        for state in test_opt1:
+        for state in basis_states:
             state_n=quft*state
             state_n=state_n.unit()
             vectors.append(state_n)
     elif choice == 5: #Hadamard option 2
         h=tensor_fix(qt.hadamard_transform(bits))
-        for state in test_opt2:
+        for state in basis_states:
             state_n=h*state
             state_n=state_n.unit()
             vectors.append(state_n)
     elif choice == 6: #QFT option 2
         quft=tensor_fix(qft.qft(bits))
-        for state in test_opt2:
+        for state in basis_states:
             state_n=quft*state
             state_n=state_n.unit()
             vectors.append(state_n)
@@ -469,36 +480,32 @@ def gate_troubleshooter(gate,n):
             #print("fixed it!")  #there were too many "fixed it!" messages
     return gate
         
-#This is what implements Allee's code
+#This is what implements Hadamard alteration
 def h_reassign(hada):
     seed = randint(0,1)
-    if seed == 0:
+    #seed=0 #temp fix
+    if seed == 0: #alter whole hadamard
         alt_had=multi_qubit_hadamard(hada)
-    if seed == 1:
-        alt_had=alter_multi_qubit_hadamard_specifically(hada)
+    if seed == 1: #alter specific hadamard
+        alt_had=alter_hadamard(hada)
     return alt_had
 
-#Takes as input a circuit w/no str, a set of angles, state and basis vectors, categories, a population
-#As I was improvising a lot, the Colin Mochrie name STAYS
-def colin_mochrie(circuit,angles,vectors,basis,pop,cat,qubits): 
+#Colin has also changed greatly
+#Takes as input a circuit w/no str, state vectors,categories a population, number of qubits, and d dimensions of KNN
+def colin_mochrie(circuit,angles,vectors,pop,cat,qubits,d,path): 
     probabilities=[]
     n=2**qubits
     index=0
     for j in range(pop):
-        state1=basis[0]
-        state2=basis[1]
-        state3=basis[2]
-        state4=basis[3]
-        comp1=vectors[0]
-        comp2=vectors[1]
-        comp3=vectors[2]
-        comp4=vectors[3]
+        references=[]
+        for chi in range(d):
+            compare=gen_basis_vectors(n,n,4)
+            references.append(compare[chi])
         for i in range(len(circuit)):
             gate_holder=circuit[i]
             name=cat[i]
             if "Hadamard" in name:
                 alt_gate=h_reassign(gate_holder)
-                #print(name,alt_gate)
                 alt_gate=gate_troubleshooter(alt_gate,n)
                 circuit[i]=qt.Qobj(alt_gate)
                 count=0
@@ -508,10 +515,9 @@ def colin_mochrie(circuit,angles,vectors,basis,pop,cat,qubits):
                     count+=1
                     if count == 20:
                         break
-            if "Random" in name:
+            elif "Random" in name:
                 (delta,alpha,theta,beta,value)=angles[index]
                 alt_gate=random_altered_unitary_gate(delta,alpha,theta,beta,value)
-                #print(name,alt_gate)
                 alt_gate=gate_troubleshooter(alt_gate,n)
                 circuit[i]=qt.Qobj(alt_gate)
                 count=0
@@ -521,10 +527,9 @@ def colin_mochrie(circuit,angles,vectors,basis,pop,cat,qubits):
                     count+=1
                     if count == 20:
                         break
-            if "CNOT" in name:
+            elif "CNOT" in name:
                 alt_gate=rot(qubits,True)
                 alt_gate=gate_troubleshooter(alt_gate,n)
-                #print(name,alt_gate)
                 circuit[i]=qt.Qobj(alt_gate)
                 count=0
                 while circuit[i] == gate_holder:
@@ -533,15 +538,41 @@ def colin_mochrie(circuit,angles,vectors,basis,pop,cat,qubits):
                     count+=1
                     if count == 20:
                         break
-            final1=basic_b(state1,circuit)
-            prob1=dis(final1,comp1)
-            final2=basic_b(state2,circuit)
-            prob2=dis(final2,comp2)
-            final3=basic_b(state3,circuit)
-            prob3=dis(final3,comp3)
-            final4=basic_b(state4,circuit)
-            prob4=dis(final4,comp4)
-            probabilities.append([prob1,prob2,prob3,prob4,name])
+            else:
+                (ugate,angles)=unitary_gate(0) #Currently only works for cz gate
+                count=0
+                if ugate.dims == gate_holder.dims:
+                    print("yeah ok that worked") #probs not necessary anymore but don't want to jinx it
+                while ugate.dims != gate_holder.dims:
+                    ugate=qt.tensor(id2,ugate)
+                    ugate=tensor_fix(ugate)
+                    count+=1
+                    if count == 10:
+                        break
+                alt_gate=ugate*gate_holder
+                alt_gate=gate_troubleshooter(alt_gate,n)
+                circuit[i]=qt.Qobj(alt_gate)
+                count=0
+                while circuit[i] == gate_holder:
+                    circuit[i]=gate_troubleshooter(rot(qubits,True),n)
+                    print("fixing...")
+                    count+=1
+                    if count == 20:
+                        break
+            temparray=[]
+            i=0
+            for ref in references:
+                state=vectors[i]
+                final=basic_b(state,circuit)
+                prob=dis(final,ref)
+                temparray.append(prob)
+                i+=1
+            temparray.append(name)
+            probabilities.append(temparray)
+            with open(path,'a',newline='') as csvFile: #write training data to csv
+                writer = csv.writer(csvFile)
+                writer.writerow(temparray)
+            csvFile.close
             count=0
             while circuit[i] != gate_holder:
                 circuit[i]=gate_holder
@@ -558,6 +589,9 @@ def main():
     qubits=int(qubits)
     length=input("how many gates in the circuit? ")
     length=int(length)
+    d=input("Gimme a range of reference states: ")
+    d=int(d)
+    path=input("give a name of csv path you wish to save to, include .csv")
     split=input("Give training set split, in the form of a number between 0 and 1: ") #0.8 is typical
     k =input("Give a k value: ")
     k=int(k)
@@ -573,9 +607,9 @@ def main():
             continue
         else:
             alt.append(gate_troubleshooter(circuit[i],n))
-			#This is all the fun data taking parts where I compare different U's & V's
-    choice = [1,3,4,5,6]
-    vector_name = ['Basis','Hadamard 1','QFT','Hadamard 2','Fourier State']
+    #This is all the fun data taking parts where I compare different U's & V's
+    choice = [2,3,4,5,6]
+    vector_name = ['New Basis','Hadamard 1','QFT','Hadamard 2','Fourier State']
     index = 0
     for x in choice:
         choice = x
@@ -583,7 +617,7 @@ def main():
         basis=gen_basis_vectors(n,n,choice)
         print(vector_name[index])
         index = index+1
-        probs=colin_mochrie(alt,angles,vectors,basis,pop,cat,qubits)
+        probs=colin_mochrie(alt,angles,vectors,pop,cat,qubits,d,path)
         KNN(probs,split,k)
     return 0
 
