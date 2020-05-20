@@ -33,7 +33,8 @@ def h_reassign(hada):
     if seed == 0: #alter whole hadamard
         alt_had=multi_qubit_hadamard(hada)
     if seed == 1: #alter specific hadamard
-        alt_had=alter_hadamard(hada)
+        (h,seed)=hadamard_preprocessing(hada)
+        alt_had=alter_hadamard(hada,seed)
     return alt_had
     
 #Looks awful, I promise it isn't. while loops are mostly security
