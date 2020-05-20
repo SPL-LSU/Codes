@@ -3,7 +3,7 @@ Created on Tue May 19 12:54:25 2020
 Redoing Hadamard Alteration for less functions and errors.
 
 Coding comments:
-Needs to be tested by should function the same way.
+Needs to be tested by should function the same way. Update: it works yo
 Not pretty, but elimates decomposition of unitaries and generation of unused combinations.
 
 Physics explanation:
@@ -56,7 +56,7 @@ def hadamard_preprocessing(hada):
                 break
         #initialize test unitary
         if seed == 0:
-            u1=qt.hadamard_tranform(1)
+            u1=qt.hadamard_transform(1)
         else:
             u1=id2
         #create test unitary
@@ -77,7 +77,7 @@ def hadamard_preprocessing(hada):
             forbidden.append(seed)
     return hada,seed
 
-#can feed as input the preprocessing step
+#can feed as input seed from the preprocessing step
 def alter_hadamard(hada,seed):
     (n,n)=hada.shape
     theta = uniform(0.0,math.pi*2.0)
@@ -91,7 +91,7 @@ def alter_hadamard(hada,seed):
     elif phaser==2:
         gate = qt.ry(theta)
     else:
-        gate=qt.gloablphase(theta)
+        gate=qt.globalphase(theta)
         
     #alter gate
     if seed == 0:
@@ -101,7 +101,7 @@ def alter_hadamard(hada,seed):
     i=1
     while u1.shape != (n,n):
         if i ==seed: #set a alteration on specified qubit
-            u1=qt.tensor(u1,qt.globalphase(theta,1))
+            u1=qt.tensor(u1,gate)
             u1=tensor_fix(u1)
         else:
             u1=qt.tensor(u1,id2)
