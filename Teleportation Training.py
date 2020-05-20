@@ -183,7 +183,7 @@ def hadamard_preprocessing(hada):
         while seed in forbidden: #make sure the seed isn't forbidden
             seed=randint(0,q-1)
             count+=1
-            if count == 20: #no infinite loops
+            if count == 200: #no infinite loops
                 break
         #initialize test unitary
         if seed == 0:
@@ -202,7 +202,7 @@ def hadamard_preprocessing(hada):
         check=u1*hada
         if check.full()[0][0] > mag: #if there's a hadamard on that qubit, true
             ongoing = False
-        elif count == 20:
+        elif count == 200:
             print("oops")
             break
         else: #no hadamard on that seed qubit
@@ -470,7 +470,7 @@ def colin_mochrie(circuit,angles,vectors,pop,cat,qubits,d,path):
         for chi in range(d):
             compare=gen_basis_vectors(n,n,4)
             references.append(compare[chi])
-        state=qt.fock(n,0)
+        #state=qt.fock(n,0)
         for i in range(len(circuit)):
             gate_holder=circuit[i]
             name=cat[i]
@@ -532,11 +532,15 @@ def colin_mochrie(circuit,angles,vectors,pop,cat,qubits,d,path):
                     count+=1
                     if count == 20:
                         break
-            final=basic_b(state,circuit)
+            #final=basic_b(state,circuit)
             temparray=[]
+            t=0
             for ref in references:
+                state=vectors[t]
+                final=basic_b(state,circuit)
                 prob=dis(final,ref)
                 temparray.append(prob)
+                t+=1
             temparray.append(name)
             probabilities.append(temparray)
             with open(path,'a',newline='') as csvFile:
@@ -567,7 +571,7 @@ def main():
     d=int(d)
     qubits=3
     n=2**qubits
-    csvpath=["2TeleportTrainingData20new.csv","2TeleportTrainingData20QFT.csv","2TeleportTrainingData20Had.csv","2TeleportTrainingData20QFT2.csv"]
+    csvpath=["TeleportTrainingData200new.csv","TeleportTrainingData200QFT.csv","TeleportTrainingData200Had.csv","TeleportTrainingData200QFT2.csv"]
     state_creator=[hadamaker(qubits,[1]),qt.cnot(qubits,1,2),qt.cnot(qubits,0,1),hadamaker(qubits,[0]),qt.cnot(qubits,1,2),conv_cz()]
     state_creator_tags=["Hadamard","CNOT","CNOT2","Hadamard2","CNOT3","Control Z"]
     circuit=[]

@@ -160,7 +160,7 @@ def hadamard_preprocessing(hada):
         while seed in forbidden: #make sure the seed isn't forbidden
             seed=randint(0,q-1)
             count+=1
-            if count == 20: #no infinite loops
+            if count == 200: #no infinite loops
                 break
         #initialize test unitary
         if seed == 0:
@@ -179,7 +179,7 @@ def hadamard_preprocessing(hada):
         check=u1*hada
         if check.full()[0][0] > mag: #if there's a hadamard on that qubit, true
             ongoing = False
-        elif count == 20:
+        elif count == 200:
             print("oops")
             break
         else: #no hadamard on that seed qubit
@@ -501,7 +501,7 @@ def colin_mochrie(circuit,angles,vectors,pop,cat,qubits,d,path):
         for chi in range(d):
             compare=gen_basis_vectors(n,n,4)
             references.append(compare[chi])
-        state=qt.fock(16,0)
+        #state=qt.fock(16,0)
         for i in range(len(circuit)):
             gate_holder=circuit[i]
             name=cat[i]
@@ -542,25 +542,16 @@ def colin_mochrie(circuit,angles,vectors,pop,cat,qubits,d,path):
                     count+=1
                     if count == 20:
                         break
-            final=basic_b(state,circuit)
+            #final=basic_b(state,circuit)
             temparray=[]
+            t=0
             for ref in references:
+                state=vectors[t]
+                final=basic_b(state,circuit)
                 prob=dis(final,ref)
                 temparray.append(prob)
+                t+=1
             temparray.append(name)
-            """
-            final1=basic_b(state,circuit)
-            prob1=dis(final1,state1)
-            final2=basic_b(state,circuit)
-            prob2=dis(final2,state2)
-            final3=basic_b(state,circuit)
-            prob3=dis(final3,state3)
-            final4=basic_b(state,circuit)
-            prob4=dis(final4,state4)
-            final5=basic_b(state,circuit)
-            prob5=dis(final5,state5)
-            """
-            #probabilities.append([prob1,prob2,prob3,prob4,prob5,name])
             probabilities.append(temparray)
             with open(path,'a',newline='') as csvFile:
                 writer = csv.writer(csvFile)
@@ -625,7 +616,7 @@ def main():
     d=int(d)
     qubits=4
     n=2**qubits
-    csvpath=["2RepeaterTrainingData200new.csv","2RepeaterTrainingData200QFT.csv","2RepeaterTrainingData200Had.csv","2RepeaterTrainingData200QFT2.csv"]
+    csvpath=["RepeaterTrainingData20new.csv","RepeaterTrainingData20QFT.csv","RepeaterTrainingData20Had.csv","RepeaterTrainingData20QFT2.csv"]
     #special subset for quantum repeater
     state_creator=[hadamaker(qubits,[0,3]),qt.cnot(qubits,0,1),qt.cnot(qubits,2,3),hadamaker(4,[0,1,2,3])]
     state_creator_tags=["Hadamard,create","CNOT,create","CNOT,create","Hadamard,create"]
