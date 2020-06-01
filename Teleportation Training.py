@@ -20,9 +20,6 @@ KNN Block
 
 #splits the data set into testing and training data. Need to initialize empty vectors first
 def handleDataset(array,split,trainingSet=[],testSet=[]):
-    #with open(filename,'r') as csvfile:
-        #lines = csv.reader(csvfile)
-        #dataset=list(lines)
     dataset=array
     for x in range(len(dataset)-1):
         for y in range(len(dataset[0])-1):
@@ -31,7 +28,6 @@ def handleDataset(array,split,trainingSet=[],testSet=[]):
                 trainingSet.append(dataset[x])
             else:
                 testSet.append(dataset[x])
-        #print(trainingSet, 'aaaahhh', testSet)
     return 0
 
 #Finds the euclidean distance bewteen two vectors of length 'length;
@@ -153,8 +149,6 @@ def gate_troubleshooter(gate,n):
                 gate=tensor_fix(gate)
         if gate.shape != (n,n):
             print("FUUUUUUUUUUUUUUUUU")
-        #else:
-            #print("fixed it!")  
     return gate
 
 """
@@ -173,99 +167,86 @@ def multi_qubit_hadamard(regular_hadamard_gate):
     multi_qubit_hadamard = tensor_fix(multi_qubit_hadamard)    
     return multi_qubit_hadamard
 
-def identifying_identities_and_hadamards(multi_qubit_hadamard):
-    (n,n) = multi_qubit_hadamard.shape
-    Q = np.log(n)/np.log(2)#Q is the number of qubits
-    multi_qubit_hadamard = multi_qubit_hadamard.full()
-    m = multi_qubit_hadamard.item(0) #m is the numberical value of cell from original array
-    m = m.real
-    H = np.log(m)/np.log(1/math.sqrt(2)) #H is the number of hadamrd gates applied
-    H = np.rint(H) # making H an integer incase of slight rounding errors
-    return Q,H
-
-def combination_possibilities(Q,H):
-    all_possible = list(product('HI',repeat = int(Q)))
-    x=0
-    limited_possibilities = []
-    for ele in all_possible:
-        h = count_occurances(ele,'H')
-        h = int(h)
-        if h == H:
-            limited_possibilities.append(ele)
+#Looks awful, I promise it isn't. while loops are mostly security
+#Just figures out whether there's a hadamard present we can alter
+def hadamard_preprocessing(hada):
+    storage=hada.full()
+    (n,n)=hada.shape
+    q=np.log(n)/np.log(2) #number of qubits
+    seed=randint(0,q-1)
+    forbidden=[] #a vector to hold forbidden seeds
+    mag=storage[0][0] #magnitude of the elements in the hadamard
+    ongoing=True
+    while ongoing:
+        i=1
+        count=0
+        while seed in forbidden: #make sure the seed isn't forbidden
+            seed=randint(0,q-1)
+            count+=1
+            if count == 200: #no infinite loops
+                break
+        #initialize test unitary
+        if seed == 0:
+            u1=qt.hadamard_transform(1)
         else:
-            x = x+1 #this else is set up to that it can be used to debug if necessary
-    return limited_possibilities  
+            u1=id2
+        #create test unitary
+        while u1.shape != (n,n):
+            if i ==seed: #set a hadamard on specified qubit
+                u1=qt.tensor(u1,qt.hadamard_transform(1))
+                u1=tensor_fix(u1)
+            else:
+                u1=qt.tensor(u1,id2)
+                u1=tensor_fix(u1)
+            i+=1
+        check=u1*hada
+        if check.full()[0][0] > mag: #if there's a hadamard on that qubit, true
+            ongoing = False
+        elif count == 200:
+            print("oops")
+            break
+        else: #no hadamard on that seed qubit
+            forbidden.append(seed)
+    return hada,seed
 
-def count_occurances(ele, gate):
-    count = 0
-    for x in ele:
-        if (x == gate):
-            count = count +1
-    return count
-
-def tensor_elements_correctly(ele):
-    if ele[0] == 'H':
-        possible_array = qt.hadamard_transform(1)
-    elif ele[0] == 'I':
-        possible_array = qt.identity(2)
-        
-    for x in ele[1:len(ele)]:
-        if x == 'H':
-            possible_array = tensor_fix(qt.tensor(possible_array,qt.hadamard_transform(1)))
-        elif x == 'I':
-            possible_array = tensor_fix(qt.tensor(possible_array,qt.identity(2)))
-    return possible_array,ele
-    
-def combinations_to_arrays(limited_possibilities):
-    possible_arrays = []
-    array_of_combinations= []
-    for ele in limited_possibilities:
-        possible_array,ele = tensor_elements_correctly(ele)
-        possible_arrays.append(possible_array)
-        array_of_combinations.append(ele)
-    return possible_arrays,array_of_combinations
-
-def correct_combination(multi_qubit_hadamard,possible_arrays,array_of_combinations):
-    array_location = possible_arrays.index(multi_qubit_hadamard)
-    combination = array_of_combinations[array_location]
-    return combination
-
-def hadamard_with_phase_shift():
+#can feed as input the preprocessing step
+def alter_hadamard(hada,seed):
+    (n,n)=hada.shape
     theta = uniform(0.0,math.pi*2.0)
-    shifted_hadamard = qt.globalphase(theta,1)*(qt.hadamard_transform(1))
-    return qt.Qobj(shifted_hadamard)
-
-def tensor_elements_incorrectly(combination):
-    if combination[0] == 'H':
-        altered_array = hadamard_with_phase_shift()
-    elif combination[0] == 'I':
-        altered_array = qt.identity(2)
-        
-    for x in combination[1:len(combination)]:
-        if x == 'H':
-            altered_array = tensor_fix(qt.tensor(altered_array,hadamard_with_phase_shift()))
-        elif x == 'I':
-            altered_array = tensor_fix(qt.tensor(altered_array,qt.identity(2)))
-    altered_array= altered_array.full()
-    altered_array = altered_array.real
-    altered_array = qt.Qobj(altered_array)
-    return altered_array
-        
-
-def alter_multi_qubit_hadamard_specifically(multi_qubit_hadamard):
-    Q,H = identifying_identities_and_hadamards(multi_qubit_hadamard)
-    limited_possibilities = combination_possibilities(Q,H)
-    possible_arrays,array_of_combinations = combinations_to_arrays(limited_possibilities)
-    combination = correct_combination(multi_qubit_hadamard,possible_arrays,array_of_combinations)
-    altered_hadamard = tensor_elements_incorrectly(combination)
-    return altered_hadamard
+    #pick a rotation any rotation
+    phaser=randint(0,3)
+    if phaser ==0:
+        gate=qt.phasegate(theta)
+    elif phaser == 1:
+        gate=qt.rz(theta)
+    elif phaser==2:
+        gate = qt.ry(theta)
+    else:
+        gate=qt.globalphase(theta)
+    #alter gate
+    if seed == 0:
+        u1=gate
+    else:
+        u1=id2
+    i=1
+    while u1.shape != (n,n):
+        if i ==seed: #set a alteration on specified qubit
+            u1=qt.tensor(u1,gate)
+            u1=tensor_fix(u1)
+        else:
+            u1=qt.tensor(u1,id2)
+            u1=tensor_fix(u1)
+        i+=1
+    final_gate=u1*hada
+    return final_gate
 
 def h_reassign(hada):
     seed = randint(0,1)
-    if seed == 0:
+    if seed == 0: #alter whole hadamard
         alt_had=multi_qubit_hadamard(hada)
-    if seed == 1:
-        alt_had=alter_multi_qubit_hadamard_specifically(hada)
+    if seed == 1: #alter specific hadamard
+        (h,seed)=hadamard_preprocessing(hada)
+        alt_had=alter_hadamard(hada,seed)
     return alt_had
 
 #affect is list of affected qubits, 0 indexed
@@ -380,7 +361,6 @@ def categorize(circuit):
     it_id=0
     composition=[]
     
-    
     for i in range(len(circuit)):
         if i % 2 != 0:
             continue
@@ -432,9 +412,6 @@ def gen_basis_vectors(n,dims,choice):
     vectors=[]
     basic_states=[]
     bits=int(math.log(n,2))
-    #for i in range(n):
-        #state=qt.basis(n,i)
-        #fock_states.append(state)
     q=rabbit(bits,[],0)
     basic_states.append(q)
     q=rabbit(bits,[1],0)
@@ -448,8 +425,6 @@ def gen_basis_vectors(n,dims,choice):
     basic_states.append(q)
     test_opt1=[basic_states[0],basic_states[1],basic_states[2],basic_states[3]]
     test_opt2=[basic_states[0],basic_states[1],basic_states[2],basic_states[3],basic_states[-1]+basic_states[1]]
-    #test_opt1=[fock_states[0],fock_states[1],fock_states[2],fock_states[3],fock_states[-1]+fock_states[1]]
-    #test_opt2=[fock_states[0],fock_states[0]+fock_states[1],fock_states[-1]+fock_states[0]+fock_states[1],fock_states[-2]+fock_states[1]+fock_states[0]+fock_states[-1],fock_states[-2]+fock_states[1]+fock_states[0]+fock_states[-1]]
     if choice == 1: #Basis states
         vectors = basic_states
         q=qt.Qobj(np.ones(n))
@@ -459,13 +434,6 @@ def gen_basis_vectors(n,dims,choice):
     elif choice ==2:
         vectors=basic_states
     elif choice == 3: #Hadamard option 1
-        """
-        h=tensor_fix(qt.hadamard_transform(bits))
-        for state in test_opt1:
-            state_n=h*state
-            state_n=state_n.unit()
-            vectors.append(state_n)
-        """
         h=tensor_fix(qt.hadamard_transform(bits))
         for state in basic_states:
             state_n=h*state
@@ -473,21 +441,18 @@ def gen_basis_vectors(n,dims,choice):
             vectors.append(state_n)
     elif choice == 4: #QFT option 1
         quft=tensor_fix(qft.qft(bits))
-        #for state in test_opt1:
         for state in basic_states:
             state_n=quft*state
             state_n=state_n.unit()
             vectors.append(state_n)
     elif choice == 5: #Hadamard option 2
         h=tensor_fix(qt.hadamard_transform(bits))
-        #for state in test_opt2:
         for state in basic_states:
             state_n=h*state
             state_n=state_n.unit()
             vectors.append(state_n)
     elif choice == 6: #QFT option 2
         quft=tensor_fix(qft.qft(bits))
-        #for state in test_opt2:
         for state in basic_states:
             state_n=quft*state
             state_n=state_n.unit()
@@ -505,7 +470,7 @@ def colin_mochrie(circuit,angles,vectors,pop,cat,qubits,d,path):
         for chi in range(d):
             compare=gen_basis_vectors(n,n,4)
             references.append(compare[chi])
-        state=qt.fock(n,0)
+        #state=qt.fock(n,0)
         for i in range(len(circuit)):
             gate_holder=circuit[i]
             name=cat[i]
@@ -547,8 +512,7 @@ def colin_mochrie(circuit,angles,vectors,pop,cat,qubits,d,path):
                     if count == 20:
                         break
             else:
-                (ugate,angles)=unitary_gate(0)
-                #Currently only works for cz gate
+                (ugate,angles)=unitary_gate(0) #Currently only works for cz gate
                 count=0
                 if ugate.dims == gate_holder.dims:
                     print("yeah ok that worked")
@@ -568,11 +532,15 @@ def colin_mochrie(circuit,angles,vectors,pop,cat,qubits,d,path):
                     count+=1
                     if count == 20:
                         break
-            final=basic_b(state,circuit)
+            #final=basic_b(state,circuit)
             temparray=[]
+            t=0
             for ref in references:
+                state=vectors[t]
+                final=basic_b(state,circuit)
                 prob=dis(final,ref)
                 temparray.append(prob)
+                t+=1
             temparray.append(name)
             probabilities.append(temparray)
             with open(path,'a',newline='') as csvFile:
@@ -601,10 +569,9 @@ def main():
     k=int(k)
     d=input("Gimme a range of reference states: ")
     d=int(d)
-    
     qubits=3
     n=2**qubits
-    csvpath=["2TeleportTrainingData20new.csv","2TeleportTrainingData20QFT.csv","2TeleportTrainingData20Had.csv","2TeleportTrainingData20QFT2.csv"]
+    csvpath=["TeleportTrainingData200new.csv","TeleportTrainingData200QFT.csv","TeleportTrainingData200Had.csv","TeleportTrainingData200QFT2.csv"]
     state_creator=[hadamaker(qubits,[1]),qt.cnot(qubits,1,2),qt.cnot(qubits,0,1),hadamaker(qubits,[0]),qt.cnot(qubits,1,2),conv_cz()]
     state_creator_tags=["Hadamard","CNOT","CNOT2","Hadamard2","CNOT3","Control Z"]
     circuit=[]
@@ -620,7 +587,6 @@ def main():
             continue
         else:
             alt.append(gate_troubleshooter(circuit[i],n))
-    
     choice = [2,4,5,6]
     vector_name = ['new','QFT','Hadamard 2','Fourier State']
     index = 0
@@ -632,7 +598,6 @@ def main():
         index = index+1
         probs=colin_mochrie(alt,angles,vectors,pop,cat,qubits,d,path)
         KNN(probs,split,k)
-    
     return 0
 
 start = time.time()
