@@ -1,0 +1,179 @@
+# get_ipython().run_line_magic('matplotlib', 'inline')
+#from qiskit.tools.jupyter import *
+# Importing standard Qiskit libraries and configuring account
+from qiskit import QuantumCircuit, execute, Aer, IBMQ
+from qiskit.compiler import transpile, assemble
+from qiskit.visualization import *
+from qiskit import *
+from qiskit.providers.aer import noise, QasmSimulator, StatevectorSimulator, UnitarySimulator
+from qiskit.providers.aer.noise import NoiseModel
+import time
+
+# Loading your IBM Q account(s)
+TOKEN = '7cdd744bf44e15ed10ec717e89953246a07bef8b3daf6edd1903fe9acb5a8edb31b20fe7ed53b22ffbfb3dbcc58a37a7cd5be255f9584eecd35c5a68b761e3fc'
+IBMQ.enable_account(TOKEN)
+provider = IBMQ.get_provider()
+backend = provider.get_backend('ibmq_london')
+#==================================================================================================#
+number_of_counts = {}  # Dictionary for the total number of shots of each state obtained
+number_of_noisy_counts = {}  # Dictionary for the total number of shots of each state with noise obtained
+#==================================================================================================#
+# This function returns an image of the circuit that is being run
+def showTeleportationCircuit(qc):
+    circuit = qc.draw()
+    return circuit
+
+# This function teleports a state from qubit one to qubit three
+def teleport(qc, q):
+    qc.h(q[1])
+    qc.cx(q[1], q[2])
+    qc.cx(q[0], q[1])
+    qc.h(q[0])
+    qc.cx(q[1], q[2])
+    qc.h(q[2])
+    qc.cx(q[0], q[2])
+    qc.h(q[2])
+    return
+#==================================================================================================#
+def createState(qc, q, tag):
+    if tag == 'Zero':
+        return
+    elif tag == 'One':
+        qc.x(q[0])
+    elif tag == 'Plus':
+        qc.h(q[0])
+    elif tag == 'Minus':
+        qc.h(q[0])
+        qc.z(q[0])
+    elif tag == 'PlusI':
+        qc.h(q[0])
+        qc.s(q[0])
+    elif tag == 'MinusI':
+        qc.h(q[0])
+        qc.z(q[0])
+        qc.s(q[0])
+    return
+#==================================================================================================#
+# This function creates a noise model to apply to a circuit
+# Returns- the amount of counts for each state with noise
+def applyNoise(qc, backend_sim, device):
+    properties = device.properties()
+    gate_lengths = noise.device.parameters.gate_length_values(properties)
+    properties = device.properties()
+    coupling_map = device.configuration().coupling_map
+    #i am not sure if noise_model here will work right is qiskit is not updated
+    #i realized i had to finally update mine...
+    noise_model = noise.device.basic_device_noise_model(properties, gate_lengths=gate_lengths)
+    basis_gates = noise_model.basis_gates
+    #print(noise_model)
+    counts_noise = execute(qc, backend_sim, shots=10000,
+                           noise_model=noise_model,
+                           coupling_map=coupling_map,
+                           basis_gates=basis_gates).result().get_counts(qc)
+    return counts_noise
+#==================================================================================================#
+# This function teleports the initial qubit state 0 from qubit 1 to qubit 3 both with noise and without noise
+# Returns-nothing
+def teleportState(tag, choice, dev_str):
+    sdg_tags, h_tags = ['PlusI', 'MinusI'], ['Plus', 'Minus', 'PlusI', 'MinusI']
+    q,c = QuantumRegister(3), ClassicalRegister(1)
+    qc = QuantumCircuit(q,c)
+    createState(qc, q, tag)
+    teleport(qc,q)
+    if tag in sdg_tags:
+        qc.sdg(q[2])
+    if tag in h_tags:
+        qc.h(q[2])
+    qc.measure(q[2], c)
+    showTeleportationCircuit(qc)
+
+    if choice=='RM': #real machine
+        backend_sim = Aer.get_backend('qasm_simulator')
+        device = provider.get_backend(dev_str)
+        noise = applyNoise(qc, backend_sim, device)
+        job = execute(qc, device)
+        counts = job.result().get_counts(qc)
+        print(tag, "State:", noise)
+        number_of_counts[tag + 'State'] = noise
+        print('Noisy', tag, "State:", counts)
+        number_of_counts[tag + 'State'] = noise
+        number_of_noisy_counts[tag + 'State'] = counts
+
+    elif choice == 'PS': #perfect sim
+        backend_sim = Aer.get_backend('qasm_simulator')
+        job = execute(qc, backend_sim, shots=10000)
+        counts = job.result().get_counts(qc)
+        print(tag, "State:", counts)
+        number_of_counts[tag + 'State'] = counts
+
+    elif choice == 'NS': #noisy sim
+        backend_sim = Aer.get_backend('qasm_simulator')
+        job = execute(qc, backend_sim, shots=10000)
+        counts = job.result().get_counts(qc)
+        print(tag, "State:", counts)
+        number_of_counts[tag + 'State'] = counts
+        device = provider.get_backend(dev_str)
+        noise = applyNoise(qc, backend_sim, device)
+        print("Noisy", tag, "State:", noise)
+        number_of_noisy_counts[tag + 'State'] = noise
+    return
+#==================================================================================================#
+# This function calculates the average fidelity of teleporting all the pole states: 0, 1, +, -, +i, -i
+# Returns-average fidelity
+def calculatingFidelity(bool):
+    ZeroProb = (number_of_counts['ZeroState']['0']) / 10000
+    OneProb = (number_of_counts['OneState']['1']) / 10000
+    PlusProbZero = (number_of_counts['PlusState']['0']) / 10000
+    MinusProbOne = (number_of_counts['MinusState']['1']) / 10000
+    PlusIProbZero = (number_of_counts['PlusIState']['0']) / 10000
+    MinusIProbOne = (number_of_counts['MinusIState']['1']) / 10000
+    Fidelity = (ZeroProb + OneProb + PlusProbZero + MinusProbOne + PlusIProbZero + MinusIProbOne)/6
+    FidelityN = 0
+
+    if bool==True:
+        ZeroProbN = (number_of_noisy_counts['ZeroState']['0']) / 10000
+        OneProbN = (number_of_noisy_counts['OneState']['1']) / 10000
+        PlusProbZeroN = (number_of_noisy_counts['PlusState']['0']) / 10000
+        MinusProbOneN = (number_of_noisy_counts['MinusState']['1']) / 10000
+        PlusIProbZeroN = (number_of_noisy_counts['PlusIState']['0']) / 10000
+        MinusIProbOneN = (number_of_noisy_counts['MinusIState']['1']) / 10000
+        FidelityN = (ZeroProbN + OneProbN + PlusProbZeroN + MinusProbOneN + PlusIProbZeroN + MinusIProbOneN) / 6
+    return (Fidelity, FidelityN)
+#==================================================================================================#
+def main():
+    start=time.time()
+    choice = input('Perfect Sim (PS), Noisy Sim (NS), or Real Machine(RM)?')
+    dev_str=None
+    if choice!= 'PS':
+        print('choices: ibmq_london, ibmq_essex, ibmq_16_melbourne, ibmqx2', 'ibmq_burlington')
+        dev_str = (input('Which device do you want run on/noise model? No quotes please!'))
+    num_trials = input('How many trials?')
+    for i in range(int(num_trials)):
+        print("Trial: ", (i + 1))
+        teleportState('Zero',choice, dev_str)
+        teleportState('One',choice, dev_str)
+        teleportState('Plus',choice, dev_str)
+        teleportState('Minus',choice, dev_str)
+        teleportState('PlusI',choice, dev_str)
+        teleportState('MinusI',choice, dev_str)
+        if choice=='RM':
+            (fid, noisy_fid) = calculatingFidelity(True)
+            print('Sim Fidelity:', fid)
+            print('Noisy Fidelity:', noisy_fid)
+            print('Difference:', fid-noisy_fid)
+
+        elif choice=='PS':
+            (fid, nothing) = calculatingFidelity(False)
+            print('Ideal Fidelity:', fid)
+
+        elif choice == 'NS':
+            (fid, noisy_fid) = calculatingFidelity(True)
+            print('Ideal Fidelity:', fid)
+            print('Noisy Fidelity:', noisy_fid)
+        print("-----------------------------------------")
+    print(time.time()-start,'seconds')
+    return
+
+
+main()
+
