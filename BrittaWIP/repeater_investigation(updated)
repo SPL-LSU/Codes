@@ -1,0 +1,147 @@
+from qiskit import *
+from qiskit.compiler import transpile, assemble
+from qiskit.visualization import *
+import numpy as np
+from qiskit.providers.aer import noise, QasmSimulator, StatevectorSimulator, UnitarySimulator
+from qiskit.providers.aer.noise import NoiseModel
+import time
+#==================================================================================================#
+TOKEN = '7cdd744bf44e15ed10ec717e89953246a07bef8b3daf6edd1903fe9acb5a8edb31b20fe7ed53b22ffbfb3dbcc58a37a7cd5be255f9584eecd35c5a68b761e3fc'
+IBMQ.enable_account(TOKEN)
+provider = IBMQ.get_provider()
+simulator = Aer.get_backend('qasm_simulator')
+#==================================================================================================#
+def state_creation_circuit(index,qubits):
+    if index == 1:
+        state_create=QuantumCircuit(qubits,qubits)
+        return state_create
+    elif index ==2:
+        state_create=QuantumCircuit(qubits,qubits)
+        state_create.x(0)
+        return state_create
+    elif index == 3:
+        state_create=QuantumCircuit(qubits,qubits)
+        state_create.x(qubits-1)
+        state_create.x(0)
+        return state_create
+    elif index == 4:
+        state_create=QuantumCircuit(qubits,qubits)
+        for i in range(qubits):
+            state_create.x(i)
+        return state_create
+#==================================================================================================#
+countdown={}
+noisycounts={}
+#==================================================================================================#
+#This function creates a noise model to apply to a circuit
+# Returns- the amount of counts for each state with noise ML: How does this work???
+def applyNoise(qc, backend,shots):
+    properties = backend.properties()
+    gate_lengths = noise.device.parameters.gate_length_values(properties)
+    coupling_map = backend.configuration().coupling_map
+    noise_model = noise.device.basic_device_noise_model(properties, gate_lengths=gate_lengths)
+    #it warns me to use a different method which then doesn't work. nm has some bugs.
+    #but it will go with newest qiskit version
+    basis_gates = noise_model.basis_gates
+    result_noise = execute(qc, simulator, shots = shots,
+                          noise_model = noise_model,
+                          coupling_map = coupling_map,
+                          basis_gates = basis_gates).result()
+    counts_noise = result_noise.get_counts(qc)
+    return counts_noise
+#==================================================================================================#
+def fidelity(shots, dict): 
+    value1=(np.absolute(dict["V1"]["0000"]-.5*shots)+np.absolute(dict["V1"]["0101"]-.5*shots))
+    value1=1-(value1/shots)
+    value2=(np.absolute(dict["V2"]["0001"]-.5*shots)+np.absolute(dict["V2"]["0100"]-.5*shots))
+    value2=1-(value2/shots)
+    value3=(np.absolute(dict["V3"]["0001"]-.5*shots)+np.absolute(dict["V3"]["0100"]-.5*shots))
+    value3=1-(value3/shots)
+    value4=(np.absolute(dict["V4"]["0000"]-.5*shots)+np.absolute(dict["V4"]["0101"]-.5*shots))
+    value4=1-(value4/shots)
+    avg=(value1+value2+value3+value4)/4
+    return avg
+#==================================================================================================#
+#takes as argument a circuit, a choice of backend (numbered), and a device name (str)
+#if choice =='PS', device name is irrelevant
+def backend_choice(qc,choice,device_name,shots):
+    if choice == 'PS':
+        result = execute(qc,simulator,shots=shots).result()
+        counts = result.get_counts()
+        noise = 0
+        return counts, noise
+    if choice == 'RM':
+        backend = provider.get_backend(device_name)
+        result = execute(qc,backend,shots=shots).result()
+        counts = result.get_counts()
+        noise=applyNoise(qc, backend,shots) #returns noisy state counts data
+        return counts, noise
+    if choice == 'NS':
+        device = provider.get_backend(device_name)
+        counts=applyNoise(qc,device,shots)
+        noise=0
+        return counts, noise
+#==================================================================================================#
+##Get repeater circuit noise and fidelity
+#Why is perfect sim not 100%?
+def repeater_fidelity():
+    start = time.time()
+    choice = input('Perfect Sim (PS), Noisy Sim (NS), or Real Machine(RM)?')
+    if choice!= 'PS':
+        print('choices: ibmq_london, ibmq_essex, ibmq_16_melbourne, ibmqx2', 'ibmq_burlington')
+        device_name = (input('Which device do you want run on/noise model? No quotes please!'))
+    else:
+        device_name = None
+    shots = int(input('How many shots (<=1000)?'))
+
+    for i in range(1,5):
+        text = "V" + str(i)
+        repeater = state_creation_circuit(i, 4)
+        repeater.h(0)
+        repeater.h(2)
+        repeater.cx(0, 1)
+        repeater.cx(2, 3)
+        repeater.h(0)
+        repeater.h(1)
+        repeater.h(2)
+        repeater.h(3)
+        repeater.cx(1, 2)
+        repeater.h(3)
+        repeater.h(1)
+        repeater.h(2)
+        repeater.cx(1, 2)
+        repeater.h(1)
+        repeater.h(2)
+        repeater.cx(0, 1)
+        repeater.h(0)
+        repeater.h(1)
+        repeater.cx(0, 1)
+        repeater.h(0)
+        repeater.h(1)
+        repeater.cx(0, 1)
+        repeater.h(1)
+        repeater.cx(1, 3)
+        repeater.h(1)
+        repeater.h(3)
+        repeater.cx(0, 1)
+        repeater.h(0)
+        repeater.h(1)
+        repeater.cx(0, 1)
+        repeater.h(0)
+        repeater.h(1)
+        repeater.cx(0, 1)
+        repeater.measure(0, 0)
+        repeater.measure(2, 2)
+        (counts,noise)=backend_choice(repeater,choice,device_name, shots)
+        countdown[text]=counts
+        noisycounts[text]=noise
+
+    print("fidelity for choice: ", choice)
+    print(fidelity(shots, countdown))
+    if choice=='RM':
+        print('fidelity for noisy simulation:')
+        print(fidelity(shots,noisycounts))
+    print(time.time()-start, 'seconds')
+    return
+
+repeater_fidelity()
