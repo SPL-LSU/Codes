@@ -44,9 +44,5 @@ for path in FILES:
     with open(SAVEPLACE + path[:-4] + '_cats.txt', 'a', newline='') as csvFile:
         for key in CATS.keys():
             writer = csv.writer(csvFile)
-            writer.writerow([key+':'])
-            writer.writerow([str(CATS[key])])
+            writer.writerow([key+':  '+str(CATS[key])])
         csvFile.close()
-
-
-
