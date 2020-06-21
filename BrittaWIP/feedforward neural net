@@ -1,0 +1,371 @@
+#
+# WIP - feed-forward neural network to classify single gate error feature vectors
+# BNM June 19 '20
+# Papers/sites referenced:
+# https://arxiv.org/pdf/1710.05941v1.pdf Swish function
+# https://en.wikipedia.org/wiki/Cross_entropy
+# https://math.stackexchange.com/questions/945871/derivative-of-softmax-loss-function
+# https://medium.com/@nemkothari/feature-scaling-in-machine-learning-10e2ca2fe2d9
+
+import numpy as np
+import qutip as qt
+import math
+from random import randint, uniform, choice,random
+import time
+import csv
+import scipy.linalg as sl
+import pandas as pd
+import warnings
+import scipy.sparse as sps
+warnings.filterwarnings('ignore')
+import matplotlib.pylab as plt
+
+REPEATER_TRAINING_MAP = {'0':'Hadamardcreate','1':'CNOTcreate','2':'CNOT2','3':'Hadamard2',
+                            '4':'CNOTEntanglement','5':'HadamardEntanglement', '6':'CNOT3',
+                            '7':'Hadamard3', '8':'CNOT4', '9':'Hadamard4', '10':'CNOT5', '11':'Hadamard5',
+                            '12':'CNOT6', '13':'Hadamard6', '14':'CNOT7', '15':'Hadamard7', '16':'CNOT8',
+                            '17':'Hadamard8','18':'CNOT9'}
+
+GHZ_TRAINING_MAP = {'0':'Hadamard', '1':'CNOT','2':'CNOT2','3':'CNOT3'}
+
+
+def vecfixer(list):
+    """
+    Solves numpy bug with list--> array dims:
+    """
+    vec = np.array(list).reshape(-1,1)
+    return vec.T
+
+
+def robust_scale(set):
+    """
+    Rescale the dataset to fight outliers
+    """
+    n_features = len(set[0]) - 1
+    arr = np.array(set)
+    q_list = []
+
+    if True == True:
+        for x in range(n_features):
+            min_i, max_i = np.min(arr[:, x]), np.max(arr[:, x])
+            median = (max_i - min_i) / 2
+            q3 = (max_i - median) / 2 + median
+            q1 = (max_i - median) / 2
+            q_list.append((q1, q3))
+
+            for y in range(len(set)):
+                arr[y, x] = (arr[y, x] - q1) / (q3 - q1)
+        new_set = arr.tolist()
+        return new_set
+
+def Sigmoid(z, d):
+    """
+    Activation function
+    :param d: bool, derivative
+    """
+    if d == False:
+        return 1/(1+np.exp(-z))
+    else:
+        s = 1 / (1 + np.exp(-z))
+        return s * (1 - s)
+
+
+def Swish(z,d):
+    """
+    Activation function
+    :param d: bool ,derivative
+    """
+    f = z/(1 + np.exp(-z))
+    if d == True:
+        return f + (1-f)/(1 + np.exp(-z))
+    else:
+        return f
+
+
+def Softmax(z):
+    """
+    Activation function
+    :param d: bool, derivative
+    """
+    exps = np.exp(z - np.max(z))
+    sum = exps.sum(axis=0)
+    return exps / sum
+
+
+class two_layer_net():
+
+    def __init__(self, input, target):
+        self.input, self.target = input, target
+        self.output = np.zeros((self.target.shape[0],self.target.shape[1]))
+        self.dims = [self.input.shape[0], 18, self.target.shape[0]] #feature vector data, neurons in inner layer, #classes
+        self.WB, self.ch= {}, {}                                    #weights and biases, intermediate calculations
+        self.cost = []                                              #store loss value of network every x iterations
+        self.rate = .1                                               #learning rate weights/biases
+
+    def drop_params(self):
+        """
+        Randomly initialize weights and biases
+        """
+        np.random.seed(1)
+
+        self.WB['w1'] = np.random.randn(self.dims[1], self.dims[0])/ np.sqrt(self.dims[0])
+        self.WB['w2'] = np.random.randn(self.dims[2], self.dims[1])/ np.sqrt(self.dims[1])
+        self.WB['b1'] = np.zeros((self.dims[1],1))
+        self.WB['b2'] = np.zeros((self.dims[2],1))
+
+        return
+
+    def forward_pass(self):
+        """
+        Sends one input through the network
+        """
+
+        z1 = self.WB['w1'].dot(self.input) + self.WB['b1']
+        f1 = Swish(z1, False)
+        self.ch['z1'], self.ch['f1'] = z1, f1
+
+        z2 = self.WB['w2'].dot(f1) + self.WB['b2']
+        f2 = Softmax(z2)
+        self.ch['z2'], self.ch['f2'] = z2, f2
+
+        self.output = f2
+        loss = self.cross_entropy_loss()
+
+        return self.output, loss
+
+    def cross_entropy_loss(self):
+        loss =  -np.sum(self.target*np.log(self.output + 1e-14))
+        return loss
+
+    def backprop(self):
+        """
+        Backpropegation step
+        """
+
+        dcost_z2 = self.output - self.target
+        dcost_f1 = np.dot(self.WB['w2'].T, dcost_z2)
+
+        dcost_w2 = np.dot(dcost_z2, self.ch['f1'].T)*1./self.ch['f1'].shape[1]
+        dcost_b2 = np.dot(dcost_z2, np.ones([dcost_z2.shape[1], 1]))*1./self.ch['f1'].shape[1]
+
+        dcost_z1 = dcost_f1*((Swish(self.ch['z1'],True)))
+        dcost_w1 = np.dot(dcost_z1, self.input.T)*1./self.input.shape[1]
+        dcost_b1 = np.dot(dcost_z1, np.ones([dcost_z1.shape[1], 1]))*1./self.input.shape[1]
+
+        self.WB['w1'] = self.WB['w1'] - self.rate * dcost_w1
+        self.WB['b1'] = self.WB['b1'] - self.rate * dcost_b1
+        self.WB['w2'] = self.WB['w2'] - self.rate * dcost_w2
+        self.WB['b2'] = self.WB['b2'] - self.rate * dcost_b2
+
+        return
+
+    def predict(self, set, cats):
+        self.input = set[0]
+        self.target = cats[0]
+        self.forward_pass()
+        self.backprop()
+        accuracy = 0
+
+        print('Test Batch Results : ')
+        for x in range(len(set)):
+            self.input = set[x]
+            self.target = cats[x]
+            output, loss = self.forward_pass()
+            self.backprop()
+
+            output_cat = np.argmax(output, axis = 0)
+            output_cat = REPEATER_TRAINING_MAP[str(output_cat[0])]
+            target_cat = np.argmax(self.target, axis = 0)
+            target_cat = REPEATER_TRAINING_MAP[str(target_cat[0])]
+
+            print('___')
+            print('Predicted: ', output_cat)
+            print('Actual: ', target_cat)
+            print('___')
+
+            if (output_cat == target_cat):
+                accuracy += 1
+
+
+        print("Accuracy:", (accuracy/len(set))*100 ,"%")
+
+        return
+
+    def initialize_grad_descent(self, train, cat):
+        self.input = train
+        self.target = cat
+        np.random.seed(1)
+        self.drop_params()
+        output, loss = self.forward_pass()
+        self.backprop()
+        self.cost.append(loss)
+
+    def gradient_descent(self, train, cats, iter=7000):
+
+        for x in range(0, iter):
+
+            for i in range(len(train)):
+                self.input = train[i]
+                self.target = cats[i]
+                output, loss = self.forward_pass()
+                self.backprop()
+
+                if x == iter - 1 and i == len(train) - 1:
+                    return loss
+
+    def plot_cost(self):
+        plt.figure()
+        plt.plot(np.arange(len(self.cost)), self.cost)
+        plt.xlabel("epochs")
+        plt.ylabel("cost")
+        plt.show()
+
+
+#========data prep section==============#
+
+def one_hot_vec(n, max):
+    """
+    :return: Binary vector representation of class integer
+    """
+    vec = [0.]*int(max)
+    vec[int(n)-1] = 1
+    return vec
+
+def balance_frequency(set, cats):
+    """
+    Ensures equal frequency of all class vectors
+    """
+    max_cat = int(max(cats))
+    cat_counts = [0]*max_cat
+    for x in range(max_cat):
+        for y in cats:
+            if y == x:
+                cat_counts[x] += 1
+
+    min_cat_counts = min(cat_counts)
+    freqs_check = [0]*max_cat
+    freqs = [0]*max_cat
+
+    new_set, new_cats = [], []
+    for x in range(len(cats)):
+        cat = int(cats[x])
+        if cat < max_cat:
+            if freqs[cat] <= min_cat_counts:
+                new_set.append(set[x])
+                new_cats.append(cats[x])
+                freqs_check[cat]+=1
+
+            freqs[cat] += 1
+    #print(freqs_check)
+
+    return new_set, new_cats
+
+def handle_dataset(path):
+    """
+    Splits data into test/train
+    Represents categories as binary vectors i.e. '4' --> [0,0,0,0,1,0]
+    Returns: Lists of training vectors/class vectors
+    """
+    train_set,test_set,train_cats,test_cats = [],[],[],[]
+
+    with open(path,'r') as csvfile:
+        lines = csv.reader(csvfile, quoting=csv.QUOTE_NONNUMERIC)
+        data = list(lines)
+        data_check_dups, data_fix =[], []
+
+        #cleaning out duplicate vectors
+        for x in data:
+            if x[:-1] not in data_check_dups and len(x) == 5:
+                data_check_dups.append(x[:-1])
+                data_fix.append(x)
+
+        data_fix = robust_scale(data_fix)
+
+        for x in data_fix: #nummpy conversion issue, benign
+
+            if random() < 0.8:
+                train_set.append(x[:-1])
+                train_cats.append(x[-1])
+            else:
+                test_set.append(x[:-1])
+                test_cats.append(x[-1])
+
+    train_set, train_cats = balance_frequency(train_set, train_cats)
+    test_set, test_cats = balance_frequency(test_set, test_cats)
+
+    csvfile.close()
+    max_test, max_train = sorted(test_cats)[-1], sorted(train_cats)[-1]
+    test_cats_fixed = [one_hot_vec(x, max_test) for x in test_cats]
+    train_cats_fixed = [one_hot_vec(x, max_train) for x in train_cats]
+
+    train_set_fin = [vecfixer(vec).T for vec in train_set]
+    test_set_fin = [vecfixer(vec).T for vec in test_set]
+    train_classes_fin = [vecfixer(vec).T for vec in train_cats_fixed]
+    test_classes_fin = [vecfixer(vec).T for vec in test_cats_fixed]
+
+    return train_set_fin,test_set_fin,train_classes_fin,test_classes_fin
+
+#==========main function========#
+
+def neural_net(train, test, train_c, test_c):
+    batches_train = []
+    batches_train_c = []
+
+    index = 0
+    batchsize, previous = 20, 0 
+    temp_max = batchsize
+
+    while index < (len(train)-batchsize):
+
+        batch_temp, batch_temp_c = [], []
+        for x in range(len(train)):
+            if previous <= x < temp_max:
+                batch_temp.append(train[x])
+                batch_temp_c.append(train_c[x])
+                index += 1
+        temp_max += batchsize
+        previous += batchsize
+
+        batches_train.append(batch_temp)
+        batches_train_c.append(batch_temp_c)
+
+    net = two_layer_net(train[0],train_c[0])
+    net.initialize_grad_descent(train[0],train_c[0])
+
+    for k in range(100):
+        for x in range(len(batches_train)):
+            loss = net.gradient_descent(batches_train[x], batches_train_c[x], iter = 15)
+            if x == len(batches_train) - 1:
+                net.cost.append(loss)
+
+    net.plot_cost()
+
+    net.predict(test,test_c)
+
+    return
+
+def main():
+    path = 'training_data_with_numerals/June21/RepeaterTrainingDataQFT_June21_num.csv'
+    train, test, train_c, test_c = handle_dataset(path)
+    neural_net(train, test, train_c, test_c)
+
+    return
+
+start_time = time.time()
+main()
+print("--- %s seconds ---" % (time.time() - start_time))
+
+#RepeaterTrainingDataHad2_June21_num 14%   (learn rate = .1, inner layer = 18, batchsize = 20, 50 iters, 50 iters of 5 iters per batch)
+#RepeaterTrainingDataHad_Jun21_num       21%         (learn rate = .1, inner layer = 30, batchsize = 20, 50 iters of 5 iters per batch)
+#RepeaterTrainingDataQFT2_June_21_num    18%       (learn rate = .1, inner layer = 30, batchsize = 20, 100 iters of 15 iters per batch)
+#RepeaterTrainingDataQFT_June21_num      15%             (learn rate = .1, inner layer = 18, batchsize = 20, 100 iters of 15 per batch)
+
+#GHZTrainingDataHad2_June21_num.csv #      70% (with learn rate = .001, inner layer = 18, batchsize = 5, 50 iters of 5 iters per batch)
+#GHZTrainingDataHad_June21_num.csv #               65%                                                                  (same settings)
+#GHZTrainingDataQFT2_June21_num.csv #               65%                                                                 (same settings)
+# #GHZTrainingDataQFT_June21_num.csv" #               65%                                                               (same settings)
+
+#if error: operands could not be broadcast together with shapes (5,1) (4,1), this most likely means
+#too many duplicate vectors were taken out and the class space is different in test/train.
+#Trying to combat this with big datasets
+
