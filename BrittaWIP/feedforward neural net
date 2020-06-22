@@ -7,6 +7,7 @@
 # https://math.stackexchange.com/questions/945871/derivative-of-softmax-loss-function
 # https://medium.com/@nemkothari/feature-scaling-in-machine-learning-10e2ca2fe2d9
 
+
 import numpy as np
 import qutip as qt
 import math
@@ -89,18 +90,21 @@ def Softmax(z):
     """
     exps = np.exp(z - np.max(z))
     sum = exps.sum(axis=0)
-    return exps / sum
+    return (exps / sum)
 
 
 class two_layer_net():
 
     def __init__(self, input, target):
         self.input, self.target = input, target
+        self.inner = 20
+        self.iters = 5
+        self.batchsize = 20
         self.output = np.zeros((self.target.shape[0],self.target.shape[1]))
-        self.dims = [self.input.shape[0], 18, self.target.shape[0]] #feature vector data, neurons in inner layer, #classes
-        self.WB, self.ch= {}, {}                                    #weights and biases, intermediate calculations
-        self.cost = []                                              #store loss value of network every x iterations
-        self.rate = .1                                               #learning rate weights/biases
+        self.dims = [self.input.shape[0], self.inner, self.target.shape[0]] #feature vector data, neurons in inner layer, #classes
+        self.WB, self.ch= {}, {}                                           #weights and biases, intermediate calculations
+        self.cost = []                                                     #store loss value of network every x iterations
+        self.rate = .0072                                                  #learning rate weights/biases
 
     def drop_params(self):
         """
@@ -134,15 +138,16 @@ class two_layer_net():
         return self.output, loss
 
     def cross_entropy_loss(self):
-        loss =  -np.sum(self.target*np.log(self.output + 1e-14))
+        loss =  -np.mean(self.target*np.log(self.output + 1e-14))
         return loss
+
 
     def backprop(self):
         """
         Backpropegation step
         """
 
-        dcost_z2 = self.output - self.target
+        dcost_z2 = (self.output - self.target)
         dcost_f1 = np.dot(self.WB['w2'].T, dcost_z2)
 
         dcost_w2 = np.dot(dcost_z2, self.ch['f1'].T)*1./self.ch['f1'].shape[1]
@@ -163,15 +168,14 @@ class two_layer_net():
         self.input = set[0]
         self.target = cats[0]
         self.forward_pass()
-        self.backprop()
         accuracy = 0
+        predictions = []
 
         print('Test Batch Results : ')
         for x in range(len(set)):
             self.input = set[x]
             self.target = cats[x]
             output, loss = self.forward_pass()
-            self.backprop()
 
             output_cat = np.argmax(output, axis = 0)
             output_cat = REPEATER_TRAINING_MAP[str(output_cat[0])]
@@ -186,10 +190,12 @@ class two_layer_net():
             if (output_cat == target_cat):
                 accuracy += 1
 
+            predictions += (output_cat, target_cat)
+
 
         print("Accuracy:", (accuracy/len(set))*100 ,"%")
 
-        return
+        return predictions
 
     def initialize_grad_descent(self, train, cat):
         self.input = train
@@ -213,6 +219,31 @@ class two_layer_net():
                 if x == iter - 1 and i == len(train) - 1:
                     return loss
 
+    def batch_up(self, set, cats):
+        batches_train = []
+        batches_train_c = []
+
+        index = 0
+        batchsize, previous = self.batchsize, 0
+        temp_max = batchsize
+
+        while index < (len(set) - batchsize):
+
+            batch_temp, batch_temp_c = [], []
+            for x in range(len(set)):
+                if previous <= x < temp_max:
+                    batch_temp.append(set[x])
+                    batch_temp_c.append(cats[x])
+                    index += 1
+            temp_max += batchsize
+            previous += batchsize
+
+            batches_train.append(batch_temp)
+            batches_train_c.append(batch_temp_c)
+
+        return batches_train, batches_train_c
+
+
     def plot_cost(self):
         plt.figure()
         plt.plot(np.arange(len(self.cost)), self.cost)
@@ -220,8 +251,9 @@ class two_layer_net():
         plt.ylabel("cost")
         plt.show()
 
-
+from random import shuffle
 #========data prep section==============#
+
 
 def one_hot_vec(n, max):
     """
@@ -230,6 +262,8 @@ def one_hot_vec(n, max):
     vec = [0.]*int(max)
     vec[int(n)-1] = 1
     return vec
+
+
 
 def balance_frequency(set, cats):
     """
@@ -256,9 +290,14 @@ def balance_frequency(set, cats):
                 freqs_check[cat]+=1
 
             freqs[cat] += 1
-    #print(freqs_check)
 
-    return new_set, new_cats
+    temp = list(zip(new_set, new_cats))
+    shuffle(temp)
+    res1, res2 = zip(*temp)
+
+    return res1, res2
+
+
 
 def handle_dataset(path):
     """
@@ -275,7 +314,7 @@ def handle_dataset(path):
 
         #cleaning out duplicate vectors
         for x in data:
-            if x[:-1] not in data_check_dups and len(x) == 5:
+            if x[:-1] not in data_check_dups:
                 data_check_dups.append(x[:-1])
                 data_fix.append(x)
 
@@ -305,49 +344,34 @@ def handle_dataset(path):
 
     return train_set_fin,test_set_fin,train_classes_fin,test_classes_fin
 
+
 #==========main function========#
 
 def neural_net(train, test, train_c, test_c):
-    batches_train = []
-    batches_train_c = []
-
-    index = 0
-    batchsize, previous = 20, 0 
-    temp_max = batchsize
-
-    while index < (len(train)-batchsize):
-
-        batch_temp, batch_temp_c = [], []
-        for x in range(len(train)):
-            if previous <= x < temp_max:
-                batch_temp.append(train[x])
-                batch_temp_c.append(train_c[x])
-                index += 1
-        temp_max += batchsize
-        previous += batchsize
-
-        batches_train.append(batch_temp)
-        batches_train_c.append(batch_temp_c)
-
     net = two_layer_net(train[0],train_c[0])
     net.initialize_grad_descent(train[0],train_c[0])
+    inners, batchsize, rate, iters = 30, 25, 0.09, 5
+    batches_train, batches_train_c = net.batch_up(train, train_c)
+    net.drop_params()
 
-    for k in range(100):
-        for x in range(len(batches_train)):
-            loss = net.gradient_descent(batches_train[x], batches_train_c[x], iter = 15)
-            if x == len(batches_train) - 1:
-                net.cost.append(loss)
-
+    for j in range(5):
+        for k in range(200):
+            for x in range(len(batches_train)):
+                loss = net.gradient_descent(batches_train[x], batches_train_c[x], iter=iters)
+                if x == len(batches_train) - 1:
+                    net.cost.append(loss)
+        time.sleep(60)
+        
+    predictions = net.predict(test, test_c)
     net.plot_cost()
 
-    net.predict(test,test_c)
+    return predictions
 
-    return
 
 def main():
     path = 'training_data_with_numerals/June21/RepeaterTrainingDataQFT_June21_num.csv'
     train, test, train_c, test_c = handle_dataset(path)
-    neural_net(train, test, train_c, test_c)
+    predictions1 = neural_net(train, test, train_c, test_c)
 
     return
 
@@ -355,10 +379,11 @@ start_time = time.time()
 main()
 print("--- %s seconds ---" % (time.time() - start_time))
 
-#RepeaterTrainingDataHad2_June21_num 14%   (learn rate = .1, inner layer = 18, batchsize = 20, 50 iters, 50 iters of 5 iters per batch)
-#RepeaterTrainingDataHad_Jun21_num       21%         (learn rate = .1, inner layer = 30, batchsize = 20, 50 iters of 5 iters per batch)
-#RepeaterTrainingDataQFT2_June_21_num    18%       (learn rate = .1, inner layer = 30, batchsize = 20, 100 iters of 15 iters per batch)
-#RepeaterTrainingDataQFT_June21_num      15%             (learn rate = .1, inner layer = 18, batchsize = 20, 100 iters of 15 per batch)
+
+#RepeaterTrainingDataHad2_June21_num 22%           (learn rate = .09, inner layer = 30, batchsize = 25, 200 iters of 5 iters per batch)
+#RepeaterTrainingDataHad_Jun21_num       27%       (learn rate = .09, inner layer = 30, batchsize = 25, 200 iters of 5 iters per batch)
+#RepeaterTrainingDataQFT2_June_21_num    19%      (learn rate = .09, inner layer = 30, batchsize = 25, 200 iters of 15 iters per batch)
+#RepeaterTrainingDataQFT_June21_num      24%            (learn rate = .09, inner layer = 30, batchsize = 25, 200 iters of 15 per batch)
 
 #GHZTrainingDataHad2_June21_num.csv #      70% (with learn rate = .001, inner layer = 18, batchsize = 5, 50 iters of 5 iters per batch)
 #GHZTrainingDataHad_June21_num.csv #               65%                                                                  (same settings)
@@ -368,4 +393,5 @@ print("--- %s seconds ---" % (time.time() - start_time))
 #if error: operands could not be broadcast together with shapes (5,1) (4,1), this most likely means
 #too many duplicate vectors were taken out and the class space is different in test/train.
 #Trying to combat this with big datasets
+
 
