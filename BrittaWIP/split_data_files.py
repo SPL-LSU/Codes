@@ -111,5 +111,5 @@ def divide_csvfile(path):
 
 
 
-data_loc = "training_data_with_numerals/June21/GHZTrainingDataHad2_June21_num.csv"
+data_loc = "training_data_with_numerals/June22/June24TeleportTrainingData400QFT2.csv"
 divide_csvfile(data_loc)
