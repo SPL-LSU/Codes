@@ -153,6 +153,7 @@ def rot(qubits,indices_former):
     a = randint(0,qubits-2)
     b = randint(a+1,qubits-1)
     k = qt.qip.operations.cnot(qubits,a,b)
+    k = qt.Qobj(np.random.permutation(k))
 
     if a == indices_former[0] and b == indices_former[1]:
         return rot(qubits, indices_former)
