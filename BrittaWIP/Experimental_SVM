@@ -1,0 +1,252 @@
+import csv
+import matplotlib.pyplot as plt
+import numpy as np
+from sklearn import datasets
+from tensorflow.python.framework import ops
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
+ops.reset_default_graph()
+import scipy.linalg as la
+
+# Code to apply Multi-class (Nonlinear) SVM on classical data
+
+# Gaussian Kernel:
+# K(x1, x2) = exp(-gamma * abs(x1 - x2)^2)
+
+# test/training examples have had duplicates removed, but have not been frequency balanced
+# to avoid having too few samples.
+# Files were split in split_data_files but the frequency balancing and robust scaling not used (scaling was not working right)
+
+# Results so far:
+# July2TeleportTrainingData1600new_train.csv : 0.9706     July2TeleportTrainingData1600new_test.csv: 0.9774
+#                                           {gamma =-1000000.0 (I KNOOOW), learn rate = .9, batchsize = 50, 300 batches)
+# July2TeleportTrainingData1600Had_train.csv: 0.7900      July2TeleportTrainingData1600Had_test.csv: 0.8246
+#                                           {gamma = -100.0, learn rate = .1 , batchsize = 10, 500 batches }
+# July2TeleportTrainingData1600QFT2_train.csv:  0.8789          July2TeleportTrainingData1600QFT2_test.csv 0.894
+#                                           {gamma = -100000.0, learn rate = .9, batchsize = 40, 300 batches}
+# July2TeleportTrainingData1600QFT_train.csv: .8755             July2TeleportTrainingData1600QFT_test.csv: 0.8917
+#                                           {gamma = -1000000.0, learn rate = .9, batchsize = 50, 300 batches}
+# July3RepeaterTrainingData400new_train.csv:  0.9412        July3RepeaterTrainingData400new_test.csv: 0.9429
+#                                           {gamma = -1000000.0, learn rate = .9, batchsize = 50, 300 batches}
+# July3RepeaterTrainingDataHad400_train.csv: 0.9536 July3RepeaterTrainingDataHad400_test.csv: 0.957
+#                                           {gamma = -1000000.0, learn rate = .9, batchsize = 50, 300 batches}
+# July3RepeaterTrainingDataQFT400_train.csv: 0.95346           July3RepeaterTrainingDataQFT400_test.csv: 0.9587
+#                                            {gamma = -1000000.0, learn rate = .9, batchsize = 50, 300 batches}
+# July3RepeaterTrainingDataQFT2400_train.csv: 0.9587    July3RepeaterTrainingDataQFT2400_test.csv: 0.95326
+#                                            {gamma = -1000000.0, learn rate = .9, batchsize = 50, 300 batches}
+
+
+
+TELEPORT_TRAINING_MAP = {'0':'Hadamard', '1':'CNOT', '2':'CNOT2', '3':'Hadamard2', '4':'CNOT3', '5':'Control Z', '6': 'Ideal'}
+
+REPEATER_TRAINING_MAP = {'0':'Hadamardcreate','1':'CNOTcreate','2':'CNOT2','3':'Hadamard2', # For testing and comparison
+                            '4':'CNOTEntanglement','5':'HadamardEntanglement', '6':'CNOT3',
+                            '7':'Hadamard3', '8':'CNOT4', '9':'Hadamard4', '10':'CNOT5', '11':'Hadamard5',
+                            '12':'CNOT6', '13':'Hadamard6', '14':'CNOT7', '15':'Hadamard7', '16':'CNOT8',
+                            '17':'Hadamard8','18':'CNOT9', '19': 'Ideal'}
+
+GHZ_TRAINING_MAP = {'0':'Hadamard', '1':'CNOT','2':'CNOT2','3':'CNOT3'}
+
+W_STATE_TRAINING_MAP = {'0': 'Rotation', '1': 'X', '2': 'X2', '3': 'CNOT', '4': 'Rotation2',
+                        '5': 'CNOT2', '6': 'Rotation3', '7': 'X3', '8': 'X4', '9':'CNOT3', '10':'CNOT4'}
+
+
+# Ideal vectors for Teleport -- have been added in to files (were being used to test for improvement with/without)
+"""
+new
+[0.7437184400574876, 0.7437184400574876, 0.7437184400574876, 0.5625000046098119, 'Ideal']
+QFT
+[0.562500001972077, 0.43435921991530446, 0.562500001972077, 0.43435922326859466, 'Ideal']
+Hadamard 2
+[0.562500001972077, 0.43435921816358347, 0.562500001972077, 0.5291972992189105, 'Ideal']
+Fourier State
+[0.562500001972077, 0.43435921991530446, 0.562500001972077, 0.43435922326859466, 'Ideal']
+"""
+# Ideal vectors for Repeater
+"""
+new
+[0.2968750041999911, 0.2968750026498871, 0.2968750041999911, 0.18934283864970108, 'Ideal']
+QFT
+[0.2968750026498871, 0.2968750020844505, 0.2968750026498871, 0.0625, 'Ideal']
+Hadamard 2
+[0.2968750026498871, 0.29687500174623077, 0.2968750026498871, 0.29687500140935913, 'Ideal']
+Fourier State
+[0.2968750026498871, 0.2968750020844505, 0.2968750026498871, 0.0625, 'Ideal']
+"""
+
+
+def handle_data(path):
+
+    datasize, data, dataset, targets = 0, [], [], []
+
+    with open(path, 'r') as csvfile:
+        lines = csv.reader(csvfile, quoting=csv.QUOTE_NONNUMERIC)
+        data = data + list(lines)
+        datasize += len(data)
+    csvfile.close()
+
+    for x in data:
+        dataset.append(x[:-1])
+        targets.append(x[-1])
+    print(set(targets))
+    classes_num, features_num = len(set(targets)), len(dataset[0])
+
+    return dataset, targets, classes_num, features_num
+
+
+def init_vals(dataset, targets, classes_num):
+
+    y = []
+    x = np.array([i for i in dataset])
+    for j in range(classes_num):
+        y_temp = [1 if k == j else -1 for k in targets]
+        y.append(y_temp)
+
+    return x, np.array(y)
+
+
+path_train = 'training_data_with_numerals/WTrainingData2000new_train.csv'
+path_test = 'training_data_with_numerals/WTrainingData2000new_test.csv'
+class_dict = W_STATE_TRAINING_MAP
+
+train_data, train_targets, classes_num_train, features_num_train = handle_data(path_train)
+test_data, test_targets, classes_num_test, features_num_test = handle_data(path_test)
+batch_size = 50
+print(classes_num_test)
+print(classes_num_train)
+features_num = features_num_train
+classes_num = classes_num_train
+
+x_vals, y_vals = init_vals(train_data, train_targets, classes_num_train)
+x_vals_t, y_vals_t = init_vals(test_data, test_targets, classes_num_test)
+
+sess =  tf.compat.v1.Session()
+
+# Placeholders
+x_data = tf.placeholder(shape=[None, features_num], dtype=tf.float32)
+y_target = tf.placeholder(shape=[classes_num, None], dtype=tf.float32)
+prediction_grid = tf.placeholder(shape=[None, features_num], dtype=tf.float32)
+
+
+# Gaussian (RBF) kernel
+gamma = tf.constant(-1000000.0)
+dist = tf.reduce_sum(tf.square(x_data), 1)
+dist = tf.reshape(dist, [-1, 1])
+sq_dists = tf.multiply(float(features_num), tf.matmul(x_data, tf.transpose(x_data)))
+my_kernel = tf.exp(tf.multiply(gamma, tf.abs(sq_dists)))
+
+def reshape_matmul(mat, _size, classes_num):
+    """
+    Function to do reshape/batch multiplication
+    """
+    v1 = tf.expand_dims(mat, 1)
+    v2 = tf.reshape(v1, [classes_num, _size, 1])
+    return tf.matmul(v2, v1)
+
+# Create variables for svm
+b = tf.Variable(tf.random_normal(shape=[classes_num, batch_size]))
+
+# Compute SVM Model
+first_term = tf.reduce_sum(b)
+b_vec_cross = tf.matmul(tf.transpose(b), b)
+y_target_cross = reshape_matmul(y_target, batch_size, classes_num)
+
+second_term = tf.reduce_sum(tf.multiply(my_kernel, tf.multiply(b_vec_cross, y_target_cross)), [1, 2])
+loss = tf.reduce_sum(tf.negative(tf.subtract(first_term, second_term)))
+
+# Gaussian (RBF) prediction kernel
+rA = tf.reshape(tf.reduce_sum(tf.square(x_data), 1), [-1, 1])
+rB = tf.reshape(tf.reduce_sum(tf.square(prediction_grid), 1), [-1, 1])
+pred_sq_dist = tf.add(tf.subtract(rA, tf.multiply(2., tf.matmul(x_data, tf.transpose(prediction_grid)))), tf.transpose(rB))
+pred_kernel = tf.exp(tf.multiply(gamma, tf.abs(pred_sq_dist)))
+
+prediction_output = tf.matmul(tf.multiply(y_target, b), pred_kernel)
+prediction = tf.argmax(prediction_output - tf.expand_dims(tf.reduce_mean(prediction_output, 1), 1), 0)
+accuracy = tf.reduce_mean(tf.cast(tf.equal(prediction, tf.argmax(y_target, 0)), tf.float32))
+
+my_opt = tf.compat.v1.train.AdagradOptimizer(.9, initial_accumulator_value=0.9, use_locking=True, name='Adagrad')
+train_step = my_opt.minimize(loss)
+
+# Initialize variables
+init = tf.global_variables_initializer()
+sess.run(init)
+
+def show_classes(batch_classes):
+    classes = [class_dict[str(x)] for x in batch_classes]
+    return classes
+
+loss_vec, batch_accuracy = [], []
+
+for i in range(300):
+
+    rand_index = np.random.choice(len(x_vals), size=batch_size)
+    rand_x = x_vals[rand_index]
+    rand_y = y_vals[:, rand_index]
+    sess.run(train_step, feed_dict={x_data: rand_x, y_target: rand_y})
+    temp_loss = sess.run(loss, feed_dict={x_data: rand_x, y_target: rand_y})
+    loss_vec.append(temp_loss)
+
+    acc_temp = sess.run(accuracy, feed_dict={x_data: rand_x,
+                                             y_target: rand_y,
+                                             prediction_grid: rand_x})
+    batch_accuracy.append(acc_temp)
+    pred = sess.run(prediction, feed_dict={x_data: rand_x, y_target: rand_y, prediction_grid: rand_x})
+    predictions_train = show_classes(pred.tolist())
+    targets_train = show_classes([np.argmax(rand_y[:, x]) for x in range(batch_size)])
+
+    if (i + 1) % 5 == 0:
+        print('_________')
+        print('Accuracy: ', acc_temp)
+        print('Step #' + str(i + 1))
+        print('Loss = ' + str(temp_loss))
+        print('Example Batch Prediction: ')
+        print('Predicted: ', predictions_train)
+        print('Actual:    ', targets_train)
+
+
+print('~~~~~~~~~~~~~~~~~')
+print('Train Accuracy Total: ', sum(batch_accuracy)/len(batch_accuracy))
+print('~~~~~~~~~~~~~~~~~')
+
+
+def plotter(values, title, ylabel):
+
+    plt.plot(values, 'k-')
+    plt.title(title)
+    plt.xlabel('Generation')
+    plt.ylabel(ylabel)
+    plt.show()
+
+    return
+
+
+plotter(batch_accuracy, 'Batch Accuracy', 'Accuracy')
+plotter(loss_vec, 'Loss Per Generation', 'Loss')
+print('Evaluating Test Set:')
+
+
+loss_vec_test, batch_accuracy_test = [], []
+
+for i in range(300):
+
+    rand_index_t = np.random.choice(len(x_vals_t), size=batch_size)
+    rand_x_t = x_vals_t[rand_index_t]
+    rand_y_t = y_vals_t[:, rand_index_t]
+    acc_temp_t = sess.run(accuracy, feed_dict={x_data: rand_x_t, y_target: rand_y_t,
+                                             prediction_grid: rand_x_t})
+    batch_accuracy_test.append(acc_temp_t)
+    pred_test = sess.run(prediction, feed_dict={x_data: rand_x_t, y_target: rand_y_t, prediction_grid: rand_x_t})
+
+    predictions_test = show_classes(pred_test.tolist())
+    targets_test = show_classes([np.argmax(rand_y_t[:, x]) for x in range(batch_size)])
+
+    if i % 50 == 0:
+        print('___________')
+        print('Example Test Batch Prediction: ')
+        print('Predicted: ', predictions_test)
+        print('Actual:    ', targets_test)
+        print('Batch Accuracy: ', acc_temp_t)
+
+
+print('Test Accuracy Total: ', sum(batch_accuracy_test) / len(batch_accuracy_test))
+
