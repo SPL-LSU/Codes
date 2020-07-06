@@ -9,6 +9,9 @@ ops.reset_default_graph()
 import scipy.linalg as la
 from tensorboard.plugins.hparams import api as hp
 
+#https://github.com/nfmcclure/tensorflow_cookbook/blob/master/04_Support_Vector_Machines/05_Implementing_Nonlinear_SVMs/05_nonlinear_svm.ipynb
+
+
 # Code to apply Multi-class (Nonlinear) SVM on classical data
 
 # Gaussian Kernel:
