@@ -7,6 +7,7 @@ import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
 ops.reset_default_graph()
 import scipy.linalg as la
+from tensorboard.plugins.hparams import api as hp
 
 # Code to apply Multi-class (Nonlinear) SVM on classical data
 
@@ -15,7 +16,6 @@ import scipy.linalg as la
 
 # test/training examples have had duplicates removed, but have not been frequency balanced
 # to avoid having too few samples.
-# Files were split in split_data_files but the frequency balancing and robust scaling not used (scaling was not working right)
 
 # Results so far:
 # July2TeleportTrainingData1600new_train.csv : 0.9706     July2TeleportTrainingData1600new_test.csv: 0.9774
@@ -36,6 +36,14 @@ import scipy.linalg as la
 #                                            {gamma = -1000000.0, learn rate = .9, batchsize = 50, 300 batches}
 
 
+# WTrainingData600Had_train.csv : 0.9978                 WTrainingData600Had_test.csv: 0.9985
+#                                                        {gamma = -1000000.0, learn rate = .9, batchsize = 50, 300 batches}
+# WTrainingData600new_train.csv :  0.9300                WTrainingData600new_test.csv:0.9415
+#                                                        {gamma = -1000000.0, learn rate = .9, batchsize = 50, 300 batches}
+# WTrainingData600QFT2_train.csv: 0.9976                  WTrainingData600QFT2_test.csv:  0.9994
+#                                                         {gamma = -1000000.0, learn rate = .9, batchsize = 50, 300 batches}
+# WTrainingData600QFT2_train.csv: 0.99786                 WTrainingData600QFT2_test: 0.99846
+#                                                         {gamma = -1000000.0, learn rate = .9, batchsize = 50, 300 batches}
 
 TELEPORT_TRAINING_MAP = {'0':'Hadamard', '1':'CNOT', '2':'CNOT2', '3':'Hadamard2', '4':'CNOT3', '5':'Control Z', '6': 'Ideal'}
 
@@ -73,6 +81,7 @@ Hadamard 2
 Fourier State
 [0.2968750026498871, 0.2968750020844505, 0.2968750026498871, 0.0625, 'Ideal']
 """
+#W-state did not have ideal vecs added since it began to seem silly
 
 
 def handle_data(path):
@@ -105,15 +114,13 @@ def init_vals(dataset, targets, classes_num):
     return x, np.array(y)
 
 
-path_train = 'training_data_with_numerals/WTrainingData2000new_train.csv'
-path_test = 'training_data_with_numerals/WTrainingData2000new_test.csv'
-class_dict = W_STATE_TRAINING_MAP
+path_train = 'training_data_with_numerals/WTrainingData600QFT2_train.csv'
+path_test = 'training_data_with_numerals/WTrainingData600QFT2_test.csv'
+class_dict =  W_STATE_TRAINING_MAP
 
 train_data, train_targets, classes_num_train, features_num_train = handle_data(path_train)
 test_data, test_targets, classes_num_test, features_num_test = handle_data(path_test)
 batch_size = 50
-print(classes_num_test)
-print(classes_num_train)
 features_num = features_num_train
 classes_num = classes_num_train
 
@@ -131,7 +138,9 @@ prediction_grid = tf.placeholder(shape=[None, features_num], dtype=tf.float32)
 # Gaussian (RBF) kernel
 gamma = tf.constant(-1000000.0)
 dist = tf.reduce_sum(tf.square(x_data), 1)
+print(dist)
 dist = tf.reshape(dist, [-1, 1])
+print(dist)
 sq_dists = tf.multiply(float(features_num), tf.matmul(x_data, tf.transpose(x_data)))
 my_kernel = tf.exp(tf.multiply(gamma, tf.abs(sq_dists)))
 
@@ -249,4 +258,6 @@ for i in range(300):
 
 
 print('Test Accuracy Total: ', sum(batch_accuracy_test) / len(batch_accuracy_test))
+
+
 
