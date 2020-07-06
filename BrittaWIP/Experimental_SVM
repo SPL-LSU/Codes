@@ -15,7 +15,7 @@ from tensorboard.plugins.hparams import api as hp
 # K(x1, x2) = exp(-gamma * abs(x1 - x2)^2)
 
 # test/training examples have had duplicates removed, but have not been frequency balanced
-# to avoid having too few samples.
+# to avoid having too few samples. (except W-state -- fixed the issue with the freq balance code and duplicate samples)
 
 # Results so far:
 # July2TeleportTrainingData1600new_train.csv : 0.9706     July2TeleportTrainingData1600new_test.csv: 0.9774
