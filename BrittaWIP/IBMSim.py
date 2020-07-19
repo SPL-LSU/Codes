@@ -15,7 +15,7 @@ from qiskit.providers.aer.noise.device import models
 from qiskit.extensions import UnitaryGate
 
 
-IBMQ.enable_account("d2616d1a300010585d9949aacd642936b2641d4544bc0ac6cb68d805cf6f58abf692c851a9653591b847cb719c2f2e57b93bd64eefeb01c3e98a8bf1ac14fa6c")
+IBMQ.enable_account("5fb2351e186ca52ed62daf9ce94aefaf2992028d9d7d9975df5a501155fe89d7b0e35cf49b1a5137287e24a791dc691f6c4baa08116c8ef2967b86cf3dac533c")
 provider = IBMQ.get_provider()
 simulator = Aer.get_backend('qasm_simulator')
 
@@ -44,7 +44,7 @@ def initialize_diagnostic_circuit(qubits, dex):
             qc.x(pos + 1)
             qc.x(pos + qubits + 1)
         pos += 1
-    for x in range(1, qubits):
+    for x in range(0, qubits):
         qc.h(x)
     return qc
 
@@ -83,6 +83,7 @@ def GHZ_circuit(qc, choice):
         qc.cx(3, 4)
         for x in range(1, qubits + 1):
             fredkin3(qc, 0, x, x + qubits)
+        qc.h(0)
         qc.measure(0, 0)
 
 
@@ -109,6 +110,7 @@ def teleportation_circuit(qc, choice):
         qc.cz(1, 3)
         for x in range(1, qubits + 1):
             fredkin3(qc, 0, x, x + qubits)
+        qc.h(0)
         qc.measure(0, 0)
 
 
@@ -143,6 +145,7 @@ def wstate_circuit(w3, choice):
         w3.cx(2, 3)
         for x in range(1, qubits + 1):
             fredkin3(w3, 0, x, x + qubits)
+        w3.h(0)
         w3.measure(0, 0)
 
 
@@ -221,6 +224,7 @@ def repeater_circuit(repeater, choice):
         repeater.cx(1, 2)
         for x in range(1, qubits + 1):
             fredkin3(repeater, 0, x, x + qubits)
+        repeater.h(0)
         repeater.measure(0, 0)
 
 
@@ -245,6 +249,7 @@ def one_qubit_adder_circuit(qc, choice):
         qc.cx(3, 1)
         for x in range(1, qubits + 1):
             fredkin3(qc, 0, x, x + qubits)
+        qc.h(0)
         qc.measure(0, 0)
 
 
@@ -306,8 +311,8 @@ def probabilities_test_data(pop):
         vectors.append(prob_vec)
         print(prob_vec)
 
-    save_path = 'ibm_data/' + circ + str(pop) + '_ibm_sim_probabilities' + dev_name + '.csv'
-    #write_data(save_path, vectors)
+    save_path = 'ibm_data/' + circ + str(pop) + '_ibm_sim_probabilities_' + dev_name + '.csv'
+    write_data(save_path, vectors)
 
 
 def fidelities_test_data(pop):
@@ -336,7 +341,7 @@ def fidelities_test_data(pop):
         vectors.append(vector)
 
     save_path = 'ibm_data/' + circ + str(pop) + '_ibm_sim_fidelities' + dev_name + '.csv'
-    #write_data(save_path, vectors)
+    write_data(save_path, vectors)
 
 
 def main(pop):
