@@ -15,7 +15,7 @@ from qiskit.providers.aer import noise
 import math
 from qiskit.extensions import UnitaryGate
 
-IBMQ.enable_account("d2616d1a300010585d9949aacd642936b2641d4544bc0ac6cb68d805cf6f58abf692c851a9653591b847cb719c2f2e57b93bd64eefeb01c3e98a8bf1ac14fa6c")
+IBMQ.enable_account("5fb2351e186ca52ed62daf9ce94aefaf2992028d9d7d9975df5a501155fe89d7b0e35cf49b1a5137287e24a791dc691f6c4baa08116c8ef2967b86cf3dac533c")
 provider = IBMQ.get_provider()
 simulator = Aer.get_backend('qasm_simulator')
 
@@ -24,7 +24,7 @@ def ideal_vector_probabilities(circ):
     # classical generated ideal vector
 
     if circ == 'wstate':
-        return [0.0833, 0.1667, 0.2429, 0.0071, 0.0833, 0.1667, 0.2429, 0.0071]
+        return  [0.0833, 0.1667, 0.2429, 0.0071, 0.0833, 0.1667, 0.2429, 0.0071]
     elif circ == 'teleport':
         return [0.25, 0.25, 0.0, 0.0, 0.25, 0.25, 0.0, 0.0]
     elif circ == 'ghz':
@@ -198,6 +198,7 @@ def GHZ_circuit(qc, circuit_errors, metric_choice):
         choose_gate(qc, circuit_errors, 'CNOT', (3, 4), None, None)
         for x in range(1, qubits + 1):
             fredkin3(qc, 0, x, x + qubits)
+        qc.h(0)
         qc.measure(0, 0)
 
 
@@ -224,6 +225,7 @@ def teleportation_circuit(qc, circuit_errors, metric_choice):
         choose_gate(qc, circuit_errors, 'CNOT', (1, 3), None, None)
         for x in range(1, qubits + 1):
             fredkin3(qc, 0, x, x + qubits)
+        qc.h(0)
         qc.measure(0, 0)
 
 # somewhere an ry dex didn't get updated...
@@ -258,6 +260,7 @@ def wstate_circuit(qc, circuit_errors, metric_choice):
         choose_gate(qc, circuit_errors, 'CNOT', (2, 3), None, None)
         for x in range(1, qubits + 1):
             fredkin3(qc, 0, x, x + qubits)
+        qc.h(0)
         qc.measure(0, 0)
 
 
@@ -336,6 +339,7 @@ def repeater_circuit(qc, circuit_errors, metric_choice):
         choose_gate(qc, circuit_errors, 'CNOT', (1, 2), None, None)
         for x in range(1, qubits + 1):
             fredkin3(qc, 0, x, x + qubits)
+        qc.h(0)
         qc.measure(0, 0)
 
 
@@ -360,6 +364,7 @@ def one_qubit_adder_circuit(qc, circuit_errors, metric_choice):
         choose_gate(qc, circuit_errors, 'CNOT', (3, 1), None, None)
         for x in range(1, qubits + 1):
             fredkin3(qc, 0, x, x + qubits)
+        qc.h(0)
         qc.measure(0, 0)
 
 
