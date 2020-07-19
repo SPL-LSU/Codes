@@ -15,7 +15,7 @@ from qiskit.providers.aer.noise.device import models
 from qiskit.extensions import UnitaryGate
 
 
-IBMQ.enable_account("5fb2351e186ca52ed62daf9ce94aefaf2992028d9d7d9975df5a501155fe89d7b0e35cf49b1a5137287e24a791dc691f6c4baa08116c8ef2967b86cf3dac533c")
+IBMQ.enable_account("f8d6cdd7739efc1e53f580c44c4b96a82ecf3b1d6679d56e42d13731579fcf5060371877eca18e0f52c7b16e56ef9945b161a678d5cadd7d77cf882f44d3c5a5")
 provider = IBMQ.get_provider()
 simulator = Aer.get_backend('qasm_simulator')
 
@@ -44,8 +44,9 @@ def initialize_diagnostic_circuit(qubits, dex):
             qc.x(pos + 1)
             qc.x(pos + qubits + 1)
         pos += 1
-    for x in range(0, qubits):
+    for x in range(0, qubits + 1):
         qc.h(x)
+        qc.h(x + qubits)
     return qc
 
 
@@ -60,9 +61,10 @@ def v_matrix(dagger):
 
 
 def fredkin3(qc, control, t1, t2):
-    qc.cx(t2, t1)
-    qc.ccx(control, t1, t2)
-    qc.cx(t2, t1)
+    # ccx control, control, target
+    qc.cx(control, t1)
+    qc.ccx(t2, t1, control)
+    qc.cx(control, t1)
     return
 
 
@@ -295,7 +297,7 @@ def probabilities_test_data(pop):
 
     circ = str(input('Which circuit? (teleport, wstate, ghz, repeater, adder)'))
     qubits = int(circ_qubits[circs.index(circ)])
-    dev_name = 'ibmq_london' # put in choice
+    dev_name = 'ibmq_16_melbourne' # put in choice
     device, noise_model = gate_error_noise_model(dev_name)
     vectors = []
 
