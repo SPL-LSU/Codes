@@ -63,6 +63,8 @@ def conv_cz(inds, choice, alter, qubits):
         # random rotations following control gate on target
         rot1 = tensor_unitary(rotation_error(), inds[1], qubits)
         gate = rot1.dot(gate.full())
+        rot2 = tensor_unitary(rotation_error(), inds[0], qubits)
+        gate = rot2.dot(gate)
         return gate
     else:
         gate = qt.qip.operations.controlled_gate(basic_z, N=qubits, control=inds[0], target=inds[1], control_value=1)
@@ -80,6 +82,8 @@ def cnot(inds, choice, alter, qubits):
         # random rotations following control gate on target
         rot1 = tensor_unitary(rotation_error(), inds[1], qubits)
         gate = rot1.dot(gate.full())
+        rot2 = tensor_unitary(rotation_error(), inds[0], qubits)
+        gate = rot2.dot(gate)
         return gate
     else:
         gate = qt.qip.operations.controlled_gate(basic_not, N=qubits, control=inds[0], target=inds[1], control_value=1)
@@ -264,10 +268,10 @@ def get_starting_state(qubits, choice, dex):
                 hadamards.append(H_0)
             else:
                 hadamards.append(H_1)
-        first = hadamards[0]
-        for x in hadamards[1:]:
-            first = np.kron(x, first)
-        return first
+        last = hadamards[-1]
+        for x in reversed(hadamards[:-1]):
+            last = np.kron(x, last)
+        return last
 
 
 def apply_circuit(state, circuit):
@@ -305,8 +309,6 @@ def dis(state1, state2, n):
     stateB = qt.Qobj(state2)
     fid=qt.fidelity(stateA, stateB)
     p_0 = 1/n + (n-1)*fid/n
-    # rounded to reflect available ibm accuracy
-    p_0 = round(p_0, 4)
     return p_0
 
 
@@ -324,7 +326,7 @@ def check_for_duplicates(check_dups, vec):
 def recursive_duplicate_hunter(start, check_dups, alt, dex, alg, index, qubits, ry_dex, psi0, gate_type):
     # duplicate hunter for probabilities data
     new_data_vec = get_altered(alt, dex, alg, index, qubits, ry_dex, psi0, gate_type)[0]
-    new_data_vec = list(np.around(np.real(np.conj(new_data_vec) * np.array(new_data_vec)), 4).astype(float))
+    new_data_vec = list(np.real(np.conj(new_data_vec) * np.array(new_data_vec)).astype(float))
     checker = check_for_duplicates(check_dups, new_data_vec)
     if checker == False and time.time() - start < 5:
         return recursive_duplicate_hunter(start, check_dups, alt, dex, alg, index, qubits, ry_dex, psi0, gate_type)
@@ -355,7 +357,6 @@ def recursive_fidelity_hunter(start, check_dups, dex, alg, index, qubits, ry_dex
 
 def gather_probabilities_data(pop, circuit, tags, indices, qubits, loc, classes):
     # Simulate the altered circuits
-    # Round vectors so data matches available accuracy of ibm machines
     # Throw out duplicate vectors
 
     depth = len(circuit)
@@ -372,7 +373,7 @@ def gather_probabilities_data(pop, circuit, tags, indices, qubits, loc, classes)
             alt = circuit.copy()
             alg = alt_algs[gate_types.index(gate_type)]
             data_vec = get_altered(alt, dex, alg, index, qubits, ry_dex, psi0, gate_type)[0]
-            data_vec = list(np.around(np.real(np.conj(data_vec) * np.array(data_vec)), 4).astype(float))
+            data_vec = list(np.real(np.conj(data_vec) * np.array(data_vec)).astype(float))
 
             if check_for_duplicates(check_dups, data_vec):
                 check_dups.append(data_vec)
@@ -380,7 +381,7 @@ def gather_probabilities_data(pop, circuit, tags, indices, qubits, loc, classes)
                 data_vec.append(class_name)
                 vecs.append(data_vec)
                 print(data_vec)
-                #write_data(data_vec, loc)
+                write_data(data_vec, loc)
             else:
                 new_data_vec = recursive_duplicate_hunter(time.time(), check_dups, alt, dex, alg, index, qubits, ry_dex, psi0, gate_type)
                 check_dups.append(new_data_vec)
@@ -388,18 +389,17 @@ def gather_probabilities_data(pop, circuit, tags, indices, qubits, loc, classes)
                 new_data_vec.append(class_name)
                 vecs.append(new_data_vec)
                 print(new_data_vec)
-                #write_data(new_data_vec, loc)
+                write_data(new_data_vec, loc)
 
     last_start = get_starting_state(qubits, 'probabilities', None)
     ideal_vec = apply_circuit(last_start, circuit).T.tolist()
-    ideal_vec = np.around(np.real(np.conj(ideal_vec) * np.array(ideal_vec)), 4)
+    ideal_vec = np.real(np.conj(ideal_vec) * np.array(ideal_vec))
     print("Ideal: ", ideal_vec.tolist()[0])
     return vecs
 
 
 def diagnostic_fidelity_circuit(pop, circuit, tags, indices, qubits, loc, classes):
     # Simulate the altered circuits
-    # Round vectors so data matches available accuracy of ibm machines
     # Throw out duplicate vectors
 
     depth = len(circuit)
@@ -420,7 +420,7 @@ def diagnostic_fidelity_circuit(pop, circuit, tags, indices, qubits, loc, classe
                 reference = psi0.copy()
                 alt = circuit.copy()
                 data_vec = get_altered(alt, dex, alg, index, qubits, ry_dex, psi0, gate_type)[0]
-                result = dis(np.array(data_vec), reference, 2 ** qubits) # probably will have issues here.
+                result = dis(np.array(data_vec), reference, 2 ** qubits)
                 vector.append(result)
 
             if check_for_duplicates(check_dups, vector):
@@ -428,14 +428,14 @@ def diagnostic_fidelity_circuit(pop, circuit, tags, indices, qubits, loc, classe
                 vector.append(class_name)
                 vecs.append(vector)
                 print(vector)
-                #write_data(vector, loc)
+                write_data(vector, loc)
             else:
                 new_data_vec = recursive_fidelity_hunter(time.time(), check_dups, dex, alg, index, qubits, ry_dex, gate_type, circuit)
                 check_dups.append(new_data_vec)
                 new_data_vec.append(class_name)
                 vecs.append(new_data_vec)
                 print(new_data_vec)
-                #write_data(new_data_vec, loc)
+                write_data(new_data_vec, loc)
 
     ideal_vector = []
     for i in range(4):
@@ -456,7 +456,7 @@ def main():
     circ_choice = str(input('Which circuit? (teleport, wstate, ghz, repeater, adder)'))
     metric_choice = str(input('Which metric are you using? (probabilities, fidelities)'))
     pop = int(input('How many errors per gate?'))
-    loc = circ_choice + '_' + str(pop) + '.csv'
+    loc = circ_choice + '_' + str(pop) + metric_choice + '_.csv'
     print(loc)
     qubits, circuit, indices, tags, classes = circ_algs[circs.index(circ_choice)]()
     if metric_choice == 'probabilities':
