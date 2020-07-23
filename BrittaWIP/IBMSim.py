@@ -62,9 +62,9 @@ def v_matrix(dagger):
 
 def fredkin3(qc, control, t1, t2):
     # ccx control, control, target
-    qc.cx(control, t1)
+    qc.cx(t2, t1)
     qc.ccx(t2, t1, control)
-    qc.cx(control, t1)
+    qc.cx(t2, t1)
     return
 
 
