@@ -1,7 +1,7 @@
-# Generate an image of fidelity variations with broken gates
+# Generate an image of fidelity/probability variations with broken gates
 # Black will be regions of high discrepancy, white is ideal
-# For science
 # B Manifold 7. 19. 20
+
 
 import numpy as np
 import qutip as qt
@@ -15,10 +15,9 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import scipy
 
-
 # Circuit Elements needed =========================================================#
 severity_range = 200
-severity_increment = math.pi / severity_range
+severity_increment = math.pi / (severity_range)
 
 def fix_indices(indices, qubits):
     # handle problem between qutip and qiskit ordering conventions
@@ -46,6 +45,7 @@ def rotation_error(severity):
     phase = qt.qip.operations.phasegate(severity).full()
 
     gate = phase.dot(rz1.dot(ry.dot(rz2)))
+    #print(gate)
     return gate
 
 
@@ -138,6 +138,7 @@ def ry_gate(pos, choice, alter, qubits, severity):
     choices = [qt.qip.operations.ry(-1.23096).full(),
                qt.qip.operations.ry(np.pi / 4).full(),
                qt.qip.operations.ry(-1 * np.pi / 4).full()]
+
     temp = pick_alter(choices[choice], rotation_error(severity).dot(choices[choice]), alter)
 
     gate = tensor_unitary(temp, pos, qubits)
@@ -254,7 +255,7 @@ def one_qubit_adder():
 
 
 def get_starting_state(bin):
-    # Starting state is hadamard transform
+    # Starting state is hadamard transform on |111...>
 
     H_0 = math.sqrt(1 / 2) * np.array([[1], [1]])
     H_1 = math.sqrt(1 / 2) * np.array([[1], [-1]])
@@ -271,6 +272,7 @@ def get_starting_state(bin):
 
 
 def apply_circuit(state, circuit):
+    # Get the final state
 
     state_fin = circuit[0].dot(state)
     for i in range(1, len(circuit)):
@@ -279,6 +281,7 @@ def apply_circuit(state, circuit):
 
 
 def write_data(vec, loc):
+
     with open(loc,'a',newline='') as csvFile:
         writer = csv.writer(csvFile)
         writer.writerow(vec)
@@ -287,9 +290,9 @@ def write_data(vec, loc):
 
 def get_altered(alg, psi0, qubits, circuit, indices, gate_type, severity, tags):
     # alter a class of gates with a particular severity
+    # ry_dex cycles through the ry gates in the w-state circuit
 
-    alt = []
-    ry_dex = 0
+    alt, ry_dex = [], 0
     for x in range(len(circuit)):
         index = indices[x]
         if tags[x] == gate_type:
@@ -310,87 +313,75 @@ def get_altered(alg, psi0, qubits, circuit, indices, gate_type, severity, tags):
 # Data Gathering ==================================================================#
 
 def dis(state1, state2, n):
+    # Return fidelity between quantum states
+
     stateA = qt.Qobj(state1)
     stateB = qt.Qobj(state2)
-    fid=qt.fidelity(stateA, stateB)
-    p_0 = 1/n + (n-1)*fid/n
-    return p_0
+    fid = qt.fidelity(stateA, stateB)
+    return fid
 
 
-def to_image(arrays, ideal_array, classes, circ_choice, metric_choice):
+def trace_distance(vec1, vec2):
+    # Return similarity of probability distributions
 
-    difference_arrays = []
-    for x in range(len(arrays)):
-        difference_arrays.append(np.ones_like(arrays[x]) - np.abs(arrays[x] - ideal_array))
+    distance = 0
+    n = len(vec1)
+    for x in range(n):
+        distance += abs(vec1[x] - vec2[x])
+    return 1 - distance / 2
+
+
+def plotter(axes, classes, difference_arrays):
+    # plotter helping function
+
+    for i in range(len(axes)):
+        axes[i].set_title(classes[i])
+        axes[i].set_title(classes[i])
+        axes[i].imshow(difference_arrays[i], cmap='gray', aspect='auto')
+        axes[i].set_ylabel(r'$\longleftarrow\theta$')
+        axes[i].set_xlabel(r'$|\psi_{i}\rangle$')
+        axes[i].set_yticks([])
+        axes[i].set_xticks([])
+
+
+def to_image(difference_arrays, classes, circ_choice, metric_choice):
+    # plotting regions of the deviation from ideal
+    # black == more deviation
 
     if len(classes) == 2:
         fig, (ax1, ax2) = plt.subplots(1, 2)
         fig.suptitle(str(metric_choice) + ' data variation for ' + str(circ_choice) + ' circuit', fontsize=15)
         axes = [ax1, ax2]
-        for i in range(len(axes)):
-            axes[i].set_title(classes[i])
-            axes[i].set_title(classes[i])
-            axes[i].imshow(difference_arrays[i], cmap='gray', aspect='auto')
-            axes[i].set_ylabel(r'$\longleftarrow\theta$')
-            axes[i].set_xlabel(r'$|\psi_{i}\rangle$')
-            axes[i].set_yticks([])
-            axes[i].set_xticks([])
+        plotter(axes, classes, difference_arrays)
     elif len(classes) == 3:
         fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
         fig.suptitle(str(metric_choice) + ' data variation for ' + str(circ_choice) + ' circuit', fontsize=15)
         axes = [ax1, ax2, ax3]
-        for i in range(len(axes)):
-            axes[i].set_title(classes[i])
-            axes[i].imshow(difference_arrays[i], cmap='gray', aspect='auto')
-            axes[i].set_ylabel(r'$\longleftarrow\theta$')
-            axes[i].set_xlabel(r'$|\psi_{i}\rangle$')
-            axes[i].set_yticks([])
-            axes[i].set_xticks([])
-
+        plotter(axes, classes, difference_arrays)
     plt.tight_layout()
     plt.subplots_adjust(top=0.85)
     plt.show()
 
-def to_projection(arrays, ideal_array, circ_choice, metric_choice, classes):
-    # subtract this image from ideal to plot the variation
 
-    difference_arrays = []
-    for x in range(len(arrays)):
-        difference_arrays.append(np.ones_like(arrays[x]) - np.abs(arrays[x] - ideal_array))
-
-    for i in range(len(difference_arrays)):
-        image = difference_arrays[i]
-        xx, yy = np.mgrid[0:image.shape[0], 0:image.shape[1]]
-        fig = plt.figure()
-        ax = fig.gca(projection='3d')
-        fig.suptitle(str(metric_choice) + ' data variation for ' + str(circ_choice) + ' circuit (' + classes[i] + ')', fontsize=15)
-        ax.plot_surface(xx, yy, image, rstride=1, cstride=1, cmap=plt.cm.gray, linewidth=0)
-        ax.set_ylabel(r'$|\psi_{i}\rangle \longrightarrow $')
-        ax.set_xlabel(r'$\theta\longrightarrow$')
-        ax.set_yticks([])
-        ax.set_xticks([])
-        plt.show()
-
-    return
-
-
-def diagnostic_fidelity_image():
-    # Plot images of changing error (from 0 to pi rotations)for different classes in a circuit
-    circ_algs = [teleportation_circuit, w_state_circuit, ghz_circuit, repeater_circuit, one_qubit_adder]
-    circs = ['teleport', 'wstate', 'ghz', 'repeater', 'adder']
+def diagnostic_image():
     circ_choice = str(input('Which circuit? (teleport, wstate, ghz, repeater, adder)'))
     metric_choice = str(input('Which metric?(fidelities, probabilities)'))
-    loc = circ_choice + 'image' +  '_.csv' # filetype
-    print(loc)
+    circ_algs = [teleportation_circuit, w_state_circuit, ghz_circuit, repeater_circuit, one_qubit_adder]
+    circs = ['teleport', 'wstate', 'ghz', 'repeater', 'adder']
     qubits, circuit, indices, tags, classes = circ_algs[circs.index(circ_choice)]()
-    images = []
     gate_types = ["HADAMARD", "CNOT", "X", "RY", "CZ", "TOFFOLI"]
     alt_algs = [hadamaker, cnot, paulix, ry_gate, conv_cz, toffoli]
+    images = []
     for gate_type in classes:
         image = []
         for severity in range(severity_range):
             alg = alt_algs[gate_types.index(gate_type)]
-            if metric_choice == 'fidelities':
+            if metric_choice == 'probabilities':
+                psi0 = get_starting_state('1' * qubits)
+                data_vec = get_altered(alg, psi0, qubits, circuit, indices, gate_type, severity, tags)[0]
+                result = list(np.real(np.conj(data_vec) * np.array(data_vec)).astype(float))
+                image.append(result)
+            elif metric_choice == 'fidelities':
                 vector = []
                 for i in range(2 ** qubits):
                     bin = np.binary_repr(i).zfill(qubits)
@@ -401,17 +392,16 @@ def diagnostic_fidelity_image():
                     vector.append(result)
                 print(vector)
                 image.append(vector)
-            elif metric_choice == 'probabilities':
-                psi0 = get_starting_state('0' * qubits)
-                data_vec = get_altered(alg, psi0, qubits, circuit, indices, gate_type, severity, tags)[0]
-                result = list(np.real(np.conj(data_vec) * np.array(data_vec)).astype(float))
-                image.append(result)
         images.append(np.array(image))
 
 
-    # generate the ideal image to take the difference
-    ideal_vector = []
-    if metric_choice == 'fidelities':
+    ideal_vector, ideal_array, difference_arrays = [], [], []
+    if metric_choice == 'probabilities':
+        psi0 =  get_starting_state('1' * qubits)
+        state_fin = apply_circuit(psi0, circuit)
+        result = [x[0] for x in np.real(np.conj(state_fin) * state_fin).astype(float).tolist()]
+        ideal_vector += result
+    elif metric_choice == 'fidelities':
         for i in range(2 ** qubits):
             bin = np.binary_repr(i).zfill(qubits)
             psi0 = get_starting_state(bin)
@@ -419,20 +409,14 @@ def diagnostic_fidelity_image():
             state_fin = apply_circuit(psi0, circuit)
             distance = dis(state_fin, reference, 2 ** qubits)
             ideal_vector.append(distance)
-    elif metric_choice == 'probabilities':
-        psi0 =  get_starting_state('0' * qubits)
-        state_fin = apply_circuit(psi0, circuit)[0]
-        result = list(np.real(np.conj(state_fin) * np.array(state_fin)).astype(float))
-        ideal_vector += result
-
-    # ideal array for one image
-    ideal_array = []
     for x in range(severity_range):
         ideal_array.append(ideal_vector)
 
     ideal_array = np.array(ideal_array)
+    for x in range(len(images)):
+        difference_arrays.append(np.ones_like(images[x]) - np.abs(images[x] - ideal_array[x]))
+    to_image(difference_arrays, classes, circ_choice, metric_choice)
 
-    to_image(images, ideal_array, classes, circ_choice, metric_choice)
-    #to_projection(images, ideal_array, circ_choice, metric_choice, classes)
+    return images, classes, ideal_array
 
-diagnostic_fidelity_image()
+diagnostic_image()
