@@ -1,6 +1,6 @@
 # code to gather noisy simulator test data for circuits
 # choice of probabilities data or fidelities data
-# B Manifold 7.14.20
+# B Manifold updated 7.24.20
 
 import numpy as np
 import qiskit as q
@@ -15,10 +15,9 @@ from qiskit.providers.aer.noise.device import models
 from qiskit.extensions import UnitaryGate
 
 
-IBMQ.enable_account("f8d6cdd7739efc1e53f580c44c4b96a82ecf3b1d6679d56e42d13731579fcf5060371877eca18e0f52c7b16e56ef9945b161a678d5cadd7d77cf882f44d3c5a5")
+IBMQ.enable_account("0f09e89596193d3248de3fc64bcc30164e5a563e971effbc1a2c2e121ee61dfddcfb261425d12fb48ab07cb1b6df3299aebe5fc4f1658f5c8604adeaa857a895")
 provider = IBMQ.get_provider()
 simulator = Aer.get_backend('qasm_simulator')
-
 
 def initialize_circuit(qubits):
     # Initial state is Hadamard transform on |111..>
@@ -37,35 +36,24 @@ def initialize_diagnostic_circuit(qubits, dex):
 
     choices, qs = [['000', '101', '010', '111'], ['0000', '1001', '0110', '1111'], ['00000', '10001', '01110', '11111']], [3, 4, 5]
     bin = choices[qs.index(qubits)][dex]
+
     qc = QuantumCircuit(2 * qubits + 1, 1)
     pos = 0
-    for x in bin:
+    for x in reversed(bin):
         if x == '1':
             qc.x(pos + 1)
             qc.x(pos + qubits + 1)
         pos += 1
-    for x in range(0, qubits + 1):
+    for x in range(1, 2 * qubits + 1):
+        # hadamards on all logical qubits
         qc.h(x)
-        qc.h(x + qubits)
     return qc
 
 
-def v_matrix(dagger):
-
-    w = (1 + 1j) / 2
-    v = np.array([[w, -1j * w],[-1j * w, w]])
-    if dagger:
-        return np.conj(v).T
-    else:
-        return v
-
-
 def fredkin3(qc, control, t1, t2):
-    # ccx control, control, target
-    qc.cx(t2, t1)
-    qc.ccx(t2, t1, control)
-    qc.cx(t2, t1)
-    return
+    # this had an issue, don't know what it was yet.
+    # but ideal vectors weren't equal for classical/ibm data
+    return qc.cswap(control, t1, t2)
 
 
 def GHZ_circuit(qc, choice):
@@ -83,9 +71,15 @@ def GHZ_circuit(qc, choice):
         qc.cx(1, 2)
         qc.cx(2, 3)
         qc.cx(3, 4)
-        for x in range(1, qubits + 1):
-            fredkin3(qc, 0, x, x + qubits)
+
+        # swap test
         qc.h(0)
+        for x in range(1, qubits + 1):
+            qc.barrier()
+            fredkin3(qc, 0, x, x + qubits)
+            qc.barrier()
+        qc.h(0)
+
         qc.measure(0, 0)
 
 
@@ -110,9 +104,15 @@ def teleportation_circuit(qc, choice):
         qc.h(1)
         qc.cx(2, 3)
         qc.cz(1, 3)
-        for x in range(1, qubits + 1):
-            fredkin3(qc, 0, x, x + qubits)
+
+        # swap test
         qc.h(0)
+        for x in range(1, qubits + 1):
+            qc.barrier()
+            fredkin3(qc, 0, x, x + qubits)
+            qc.barrier()
+        qc.h(0)
+
         qc.measure(0, 0)
 
 
@@ -145,10 +145,17 @@ def wstate_circuit(w3, choice):
         w3.x(2)
         w3.cx(1, 3)
         w3.cx(2, 3)
-        for x in range(1, qubits + 1):
-            fredkin3(w3, 0, x, x + qubits)
+
+        # swap test
         w3.h(0)
+        for x in range(1, qubits + 1):
+            w3.barrier()
+            fredkin3(w3, 0, x, x + qubits)
+            w3.barrier()
+        w3.h(0)
+
         w3.measure(0, 0)
+
 
 
 def repeater_circuit(repeater, choice):
@@ -224,9 +231,15 @@ def repeater_circuit(repeater, choice):
         repeater.h(1)
         repeater.h(2)
         repeater.cx(1, 2)
-        for x in range(1, qubits + 1):
-            fredkin3(repeater, 0, x, x + qubits)
+
+        # swap test
         repeater.h(0)
+        for x in range(1, qubits + 1):
+            repeater.barrier(0)
+            fredkin3(repeater, 0, x, x + qubits)
+            repeater.barrier(0)
+        repeater.h(0)
+
         repeater.measure(0, 0)
 
 
@@ -248,10 +261,16 @@ def one_qubit_adder_circuit(qc, choice):
         qc.ccx(5, 3, 1)
         qc.cx(5, 2)
         qc.cx(4, 2)
-        qc.cx(3, 1)
-        for x in range(1, qubits + 1):
-            fredkin3(qc, 0, x, x + qubits)
+        qc.cx(3, 2)
+
+        # swap test
         qc.h(0)
+        for x in range(1, qubits + 1):
+            qc.barrier(0)
+            fredkin3(qc, 0, x, x + qubits)
+            qc.barrier(0)
+        qc.h(0)
+
         qc.measure(0, 0)
 
 
@@ -270,15 +289,14 @@ def sort_counts(counts, qubits):
 
 
 def gate_error_noise_model(dev_name):
-    # Model only gate errors
-
+    # regular noise model for the backend
     device = provider.get_backend(dev_name)
     properties = device.properties()
-    errors = models.basic_device_gate_errors(properties, gate_error=True, thermal_relaxation=False)
-    noise_model = NoiseModel()
-    for name, qubitz, error in errors:
-        noise_model.add_quantum_error(error, name, qubitz)
-    return device, noise_model
+    gate_lengths = noise.device.parameters.gate_length_values(properties)
+    noise_model = NoiseModel.from_backend(properties, gate_lengths=gate_lengths)
+    basis_gates = noise_model.basis_gates
+    coupling_map = device.configuration().coupling_map
+    return device, noise_model, basis_gates, coupling_map
 
 
 def write_data(save_path, vectors):
@@ -288,60 +306,72 @@ def write_data(save_path, vectors):
             writer.writerow(x)
     csvFile.close()
 
-
+# lists needed for data gathering
 circs, circ_qubits = ['teleport', 'wstate', 'ghz', 'repeater', 'adder'], [3, 3, 4, 4, 5]
 circ_algs = [teleportation_circuit, wstate_circuit, GHZ_circuit, repeater_circuit, one_qubit_adder_circuit]
 
 
 def probabilities_test_data(pop):
 
+    # initialize chosen circuit, find variables and noise model parameters
     circ = str(input('Which circuit? (teleport, wstate, ghz, repeater, adder)'))
     qubits = int(circ_qubits[circs.index(circ)])
     dev_name = 'ibmq_16_melbourne' # put in choice
-    device, noise_model = gate_error_noise_model(dev_name)
+    device, noise_model, basis_gates, coupling_map = gate_error_noise_model(dev_name)
     vectors = []
 
     for x in range(pop):
+        # obtain a noisy counts vector
         algorithm = circ_algs[circs.index(circ)]
         circuit = initialize_circuit(qubits)
         algorithm(circuit, 'probabilities')
-        result = execute(circuit, backend=simulator, shots=1024, noise_model=noise_model, optimization_level=0).result()
+        result = execute(circuit, backend=simulator, shots=1024, noise_model=noise_model,
+                         basis_gates=basis_gates, optimization_level=0).result()
         counts = [result.get_counts(i) for i in range(len(result.results))]
         prob_vec = sort_counts(counts[0], qubits)
+
         # add an unknown class (necessary for tensorflow to take the dataset)
         prob_vec.append(200)
         vectors.append(prob_vec)
         print(prob_vec)
 
+    # store vectors
     save_path = 'ibm_data/' + circ + str(pop) + '_ibm_sim_probabilities_' + dev_name + '.csv'
     write_data(save_path, vectors)
 
 
 def fidelities_test_data(pop):
 
+    # initialize chosen circuit, find variables and noise model parameters
     circ = str(input('Which circuit? (teleport, wstate, ghz, repeater, adder)'))
     qubits = int(circ_qubits[circs.index(circ)])
     dev_name = 'ibmq_16_melbourne'
-    device, noise_model = gate_error_noise_model(dev_name)
+    device, noise_model, basis_gates, coupling_map = gate_error_noise_model(dev_name)
     vectors = []
 
+    # build size four vectors of chosen initial states which are indexed in get_starting_state()
     for x in range(pop):
         vector = []
         for i in range(4):
             algorithm = circ_algs[circs.index(circ)]
             circuit = initialize_diagnostic_circuit(qubits, i)
             algorithm(circuit, 'fidelities')
-            result = execute(circuit, backend=simulator, shots=1024, noise_model=noise_model, optimization_level=0).result()
+            result = execute(circuit, backend=simulator, shots=1024, noise_model=noise_model,
+                             basis_gates=basis_gates,optimization_level=0).result()
             counts = [result.get_counts(i) for i in range(len(result.results))]
+            # find the p(anc == |0>)
             if '0' in counts[0].keys():
-                vector.append(counts[0]['0'] / 1024)
+                p_0 = counts[0]['0'] / 1024
+                vector.append(p_0)
             else:
                 vector.append(0.0)
+
         # add unknown class (necessary for tensorflow to take the dataset)
         vector.append(200)
         print(vector)
         vectors.append(vector)
 
+    # store vectors
     save_path = 'ibm_data/' + circ + str(pop) + '_ibm_sim_fidelities' + dev_name + '.csv'
     write_data(save_path, vectors)
 
