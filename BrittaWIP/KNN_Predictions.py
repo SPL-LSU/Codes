@@ -113,69 +113,69 @@ def KNN(path, split, k, unknown_path, circuit_type):
     for x in range(len(classes)):
         print(classes[x], ': ', prediction_count[x] / len(unknown))
 
-KNN('sim_data/teleport_100fidelities_.csv', 0.8, 5, 'ibm_data/teleport100_ibm_sim_fidelitiesibmq_16_melbourne.csv', 'teleport')
-
+KNN('sim_data/ghz_300probabilities_.csv', 0.8, 5, 'ibm_data/ghz100_ibm_sim_probabilities_ibmq_16_melbourne.csv', 'ghz')
+# files from 7.24 after edits
 """
 Check baseline accuracies
 
-ghz_100probabilities_.csv : 98.87640449438202%
-adder_60probabilities_.csv: 95.8904109589041%
-repeater_40probabilities_.csv  : 91.76029962546816%
-teleport_100probabilities_.csv: 95.45454545454545%
-wstate_100probabilities_.csv : 87.13692946058092%
+adder_300fidelities_.csv: 96.16438356164385%
+ghz_300fidelities_.csv:  100.0% 
+repeater_600fidelities_.csv: 74.39148073022312%
+teleport_300fidelities_.csv: 88.91625615763546%
+wstate_300fidelities_.csv: 76.91154422788605%
 
-adder_60fidelities_.csv : 88.60759493670885%
-ghz_100fidelities_.csv: 100.0%
-repeater_40fidelities_.csv: 76.37795275590551%
-teleport_100fidelities_.csv: 49.333333333333336%
-wstate_100fidelities_.csv: 56.837606837606835%
+adder_300probabilities_.csv: 98.35616438356163%
+ghz_300probabilities_.csv:  100.0% 
+repeater_300probabilities_.csv:  97.27463312368972%
+teleport_300probabilities_.csv:  80.54919908466819%
+wstate_300probabilities_.csv:  97.87234042553192%
 
 # Make predictions on melbourne gates
-_____
-GHZ 
-ibm data: ghz100_ibm_sim_probabilities_ibmq_16_melbourne.csv ; sim data: ghz_100probabilities_.csv 
-HADAMARD :  0.21212121212121213
-CNOT :  0.7878787878787878
-ibm data: ghz100_ibm_sim_fidelitiesibmq_16_melbourne.csv; sim data: ghz_100fidelities_.csv
+
+GHZ Probabilities: 
+HADAMARD :  0.8686868686868687
+CNOT :  0.13131313131313133
+
+GHZ Fidelities: 
 HADAMARD :  0.0
 CNOT :  1.0
-_____
-WSTATE
-ibm data: wstate100_ibm_sim_probabilities_ibmq_16_melbourne.csv ; sim data: wstate_100probabilities_.csv 
-RY :  0.30303030303030304
-X :  0.3838383838383838
-CNOT :  0.31313131313131315
-ibm data: wstate100_ibm_sim_fidelitiesibmq_16_melbourne.csv ; sim data: wstate_100fidelities_.csv
-RY :  0.0
-X :  0.0
-CNOT :  1.0
-_____
-TELEPORT
-ibm data: teleport100_ibm_sim_probabilities_ibmq_16_melbourne.csv ; sim data: teleport_100probabilities_.csv 
-HADAMARD :  0.20202020202020202
-CNOT :  0.7272727272727273
-CZ :  0.0707070707070707
-ibm data: teleport100_ibm_sim_fidelitiesibmq_16_melbourne.csv ; sim data: teleport_100fidelities_.csv 
-HADAMARD :  0.0
-CNOT :  0.030303030303030304
-CZ :  0.9696969696969697
-_____
-ADDER
-ibm data: adder100_ibm_sim_probabilities_ibmq_16_melbourne.csv ; sim data: adder_60probabilities_.csv 
-Predicting Error Classes..
+
+Adder Probabilities: 
+TOFFOLI :  0.020202020202020204
+CNOT :  0.9797979797979798
+
+Adder Fidelities: 
 TOFFOLI :  0.0
 CNOT :  1.0
 
-ibm data: adder100_ibm_sim_fidelitiesibmq_16_melbourne.csv ; sim data: adder_60fidelities_.csv 
-TOFFOLI :  0.5252525252525253
-CNOT :  0.47474747474747475
-_____
-REPEATER
-ibm data: repeater100_ibm_sim_probabilities_ibmq_16_melbourne.csv ; sim data: repeater_40probabilities_.csv 
-HADAMARD :  0.3838383838383838
-CNOT :  0.6161616161616161
+Teleport Probabilities: 
+HADAMARD :  0.42424242424242425
+CNOT :  0.5353535353535354
+CZ :  0.04040404040404041
 
-ibm data: repeater100_ibm_sim_fidelitiesibmq_16_melbourne.csv ; sim data: repeater_40fidelities_.csv 
+Teleport Fidelities: 
+HADAMARD :  0.20202020202020202
+CNOT :  0.797979797979798
+CZ :  0.0
+
+WState Probabilities: 
+RY :  0.3838383838383838
+X :  0.23232323232323232
+CNOT :  0.3838383838383838
+
+WState Fidelities: 
+RY :  0.08080808080808081
+X :  0.0707070707070707
+CNOT :  0.8484848484848485
+
+Repeater Probabilities: 
 HADAMARD :  0.0
 CNOT :  1.0
+
+Repeater Fidelities: 
+HADAMARD :  0.6331658291457286
+CNOT :  0.36683417085427134
+
+
 """
+
