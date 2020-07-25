@@ -11,34 +11,23 @@ import csv
 # As an attempt at simplification and consolidation of a result for REU
 # Obtains two types of data which are probability vectors and fidelity data vectors
 # Classifies by gate type
-# B Manifold 7.14.20
+# B Manifold updated 7.24.20
 
+
+# 7.24 : qutips ordering convention is backwards from qiskits, but this got
+# confounded with the tensoring here, so it had to be modified
 
 # Circuit Elements needed =========================================================#
 
 
-def fix_indices(indices, qubits):
-    # handle problem between qutip and qiskit ordering conventions
-    # which apparently don't agree
-
-    new_indices = []
-    for x in indices:
-        if type(x) == tuple and len(x) == 2:
-            new_indices.append((qubits - x[0] - 1, qubits - x[1] - 1))
-        elif type(x) == tuple and len(x) == 3:
-            new_indices.append((qubits - x[0] - 1, qubits - x[1] - 1, qubits - x[2] - 1))
-        else:
-            new_indices.append(qubits - x - 1)
-    return new_indices
-
-
 def rotation_error():
     # random 2 x 2 rotation matrices for single-qubit error
+    # altered to smaller angles since ibm data failed to train well on larger angles
 
-    rz1 = qt.qip.operations.rz(random.uniform(math.pi/4, -1 * math.pi / 4)).full()
-    ry = qt.qip.operations.ry(random.uniform(math.pi/4, -1 * math.pi / 4)).full()
-    rz2 = qt.qip.operations.rz(random.uniform(math.pi/4, -1 * math.pi / 4)).full()
-    phase = qt.qip.operations.phasegate(random.uniform(math.pi/4, -1 * math.pi / 4)).full()
+    rz1 = qt.qip.operations.rz(random.uniform(0, math.pi/4)).full()
+    ry = qt.qip.operations.ry(random.uniform(0, math.pi/4)).full()
+    rz2 = qt.qip.operations.rz(random.uniform(0, math.pi/4)).full()
+    phase = qt.qip.operations.phasegate(random.uniform(0, math.pi/4)).full()
 
     gate = phase.dot(rz1.dot(ry.dot(rz2)))
     return gate
@@ -54,51 +43,59 @@ def pick_alter(original, altered, alter):
 def conv_cz(inds, choice, alter, qubits):
     # Alters or builds the Control - Z gate using rotations
     # Choice is a placeholder for data-gathering part
+    # Changed rotations to help machine learning fit
 
     basic_z = qt.Qobj(np.array([[1, 0],[0, -1]]))
+    # qiskit-qutip indexing issue
+    ind0 = qubits - inds[0] - 1
+    ind1 = qubits - inds[1] - 1
 
     if alter:
+        # random rotations applied to target qubit
         alt_z = qt.Qobj((rotation_error().dot(basic_z.full())))
-        gate = qt.qip.operations.controlled_gate(alt_z, N=qubits, control=inds[0], target=inds[1], control_value=1)
-        # random rotations following control gate on target
-        rot1 = tensor_unitary(rotation_error(), inds[1], qubits)
-        gate = rot1.dot(gate.full())
-        rot2 = tensor_unitary(rotation_error(), inds[0], qubits)
-        gate = rot2.dot(gate)
+        gate = qt.qip.operations.controlled_gate(alt_z, N=qubits, control=ind0, target=ind1, control_value=1)
+        # random rotations applied to control qubit
+        rot2 = tensor_unitary(rotation_error(), ind0, qubits)
+        gate = rot2.dot(gate.full())
         return gate
     else:
-        gate = qt.qip.operations.controlled_gate(basic_z, N=qubits, control=inds[0], target=inds[1], control_value=1)
+        gate = qt.qip.operations.controlled_gate(basic_z, N=qubits, control=ind0, target=ind1, control_value=1)
         return gate.full()
 
 
 def cnot(inds, choice, alter, qubits):
     # Alters  or builds the CNOT gates using rotations
     # Choice is a placeholder for data-gathering part
+    # Changed rotations to help machine learning fit
 
     basic_not = qt.Qobj(np.array([[0, 1],[1, 0]]))
+    # qiskit-qutip indexing issue
+    ind0 = qubits - inds[0] - 1
+    ind1 = qubits - inds[1] - 1
+
     if alter:
+        # random rotations on target qubit
         alt_not = qt.Qobj(rotation_error().dot(basic_not.full()))
-        gate = qt.qip.operations.controlled_gate(alt_not, N=qubits, control=inds[0], target=inds[1], control_value=1)
-        # random rotations following control gate on target
-        rot1 = tensor_unitary(rotation_error(), inds[1], qubits)
-        gate = rot1.dot(gate.full())
-        rot2 = tensor_unitary(rotation_error(), inds[0], qubits)
-        gate = rot2.dot(gate)
+        gate = qt.qip.operations.controlled_gate(alt_not, N=qubits, control=ind0, target=ind1, control_value=1)
+        # random rotations on control qubit
+        rot2 = tensor_unitary(rotation_error(), ind0, qubits)
+        gate = rot2.dot(gate.full())
         return gate
     else:
-        gate = qt.qip.operations.controlled_gate(basic_not, N=qubits, control=inds[0], target=inds[1], control_value=1)
+        gate = qt.qip.operations.controlled_gate(basic_not, N=qubits, control=ind0, target=ind1, control_value=1)
         return gate.full()
 
 
 def tensor_unitary(temp, pos, qubits):
-    # Tensor up the unitaries a la qiskit
+    # Tensor up the unitaries
+    # This is the main part that got bungled
 
-    if pos == qubits - 1:
+    if pos == 0:
         gate = temp
     else:
         gate = np.eye(2)
     start = gate
-    for i in reversed(range(0, qubits - 1)):
+    for i in range(1, qubits):
         if i == pos:
             start = np.kron(temp, start)
         else:
@@ -122,7 +119,6 @@ def paulix(pos, choice, alter, qubits):
 
     not_basic = np.array([[0, 1], [1, 0]])
     temp = pick_alter(not_basic, rotation_error().dot(not_basic), alter)
-
     gate = tensor_unitary(temp, pos, qubits)
     return gate
 
@@ -134,12 +130,12 @@ def ry_gate(pos, choice, alter, qubits):
                qt.qip.operations.ry(np.pi / 4).full(),
                qt.qip.operations.ry(-1 * np.pi / 4).full()]
     temp = pick_alter(choices[choice], rotation_error().dot(choices[choice]), alter)
-
     gate = tensor_unitary(temp, pos, qubits)
     return gate
 
 
 def tgate(pos, choice, alter, qubits):
+    # Alters or builds T gates for Adder
 
     gate = qt.Qobj(qt.qip.operations.phasegate(-math.pi/4)*qt.qip.operations.rz(math.pi/2)\
                    *qt.qip.operations.ry(2*math.pi)*qt.qip.operations.rz(0.0))
@@ -152,6 +148,7 @@ def tgate(pos, choice, alter, qubits):
 def toffoli(pos, choice, alter, qubits):
     # Alters or builds AND gates for One-Qubit adder
     # Only alters some components, so alter is False by default for some
+    # Still might split up
 
     c1, c2, target = pos[0], pos[1], pos[2]
     gates = [hadamaker(target, choice, alter, qubits), cnot((c2, target), choice, alter, qubits),
@@ -174,8 +171,7 @@ def teleportation_circuit():
     # Therefore has extra gate in the beginning
 
     qubits = 3
-    indices = [0, 1, (1, 2), (0, 1), (0), (1, 2), (0, 2)]
-    inds = fix_indices(indices, qubits)
+    inds = [0, 1, (1, 2), (0, 1), 0, (1, 2), (0, 2)]
     circuit = [hadamaker(inds[0], None, False, qubits), hadamaker(inds[1], None, False, qubits), cnot(inds[2], None, False, qubits),
                cnot(inds[3], None, False, qubits), hadamaker(inds[4], None, False, qubits), cnot(inds[5], None, False, qubits),
                conv_cz(inds[6], None, False, qubits)]
@@ -187,8 +183,7 @@ def teleportation_circuit():
 def ghz_circuit():
 
     qubits = 4
-    indices = [0, (0, 1), (1, 2), (2, 3)]
-    inds = fix_indices(indices, qubits)
+    inds = [0, (0, 1), (1, 2), (2, 3)]
     circuit = [hadamaker(inds[0], None, False, qubits), cnot(inds[1], None, False, qubits), cnot(inds[2], None, False, qubits),
                cnot(inds[3], None, False, qubits)]
     tags = ["HADAMARD", "CNOT", "CNOT", "CNOT"]
@@ -199,8 +194,7 @@ def ghz_circuit():
 def w_state_circuit():
 
     qubits = 3
-    indices = [0, 1, 2, (0, 1), 0, (1, 0), 0, 0, 1, (0, 2), (1, 2)]
-    inds = fix_indices(indices, qubits)
+    inds = [0, 1, 2, (0, 1), 0, (1, 0), 0, 0, 1, (0, 2), (1, 2)]
     classes = ["RY", "X", "CNOT"]
     circuit = [ry_gate(inds[0], 0, False, qubits), paulix(inds[1], None, False, qubits), paulix(inds[2], None, False, qubits), cnot(inds[3], None, False, qubits),
                ry_gate(inds[4], 1, False, qubits), cnot(inds[5], None, False, qubits), ry_gate(inds[6], 2, False, qubits),
@@ -213,10 +207,8 @@ def w_state_circuit():
 def repeater_circuit():
 
     qubits = 4
-    indices = [0, 2, (0, 1), (2, 3), 0, 1, 2, 3, (1, 2), 3, 1, 2, (1, 2), 1, 2, (0, 1), 0, 1, (0, 1), 0, 1, (0, 1), 1, (1, 3), 1, 3, (0, 1), 0, 1, (0, 1),
+    inds = [0, 2, (0, 1), (2, 3), 0, 1, 2, 3, (1, 2), 3, 1, 2, (1, 2), 1, 2, (0, 1), 0, 1, (0, 1), 0, 1, (0, 1), 1, (1, 3), 1, 3, (0, 1), 0, 1, (0, 1),
                0, 1, (0, 1)]
-    inds = fix_indices(indices, qubits)
-    print(inds)
     algs, alg_tags = [hadamaker, cnot], ["HADAMARD", "CNOT"]
     classes = ["HADAMARD", "CNOT"]
     tags = ["HADAMARD", "HADAMARD", "CNOT", "CNOT", "HADAMARD", "HADAMARD", "HADAMARD", "HADAMARD", "CNOT", "HADAMARD", "HADAMARD", "HADAMARD",
@@ -232,8 +224,7 @@ def repeater_circuit():
 def one_qubit_adder():
 
     qubits = 5
-    indices = [(3, 2, 0), (4, 3, 0), (4, 2, 0), (4, 1), (3, 1), (2, 1)]
-    inds = fix_indices(indices, qubits)
+    inds = [(3, 2, 0), (4, 3, 0), (4, 2, 0), (4, 1), (3, 1), (2, 1)]
     algs, alg_tags = [toffoli, cnot], ["TOFFOLI", "CNOT"]
     classes = ["TOFFOLI", "CNOT"]
     tags = ["TOFFOLI", "TOFFOLI", "TOFFOLI", "CNOT", "CNOT", "CNOT"]
@@ -251,27 +242,26 @@ def get_starting_state(qubits, choice, dex):
     # Starting state is hadamard transform on |111> for probabilities
     # And various basis states for fidelities
 
+    choices, qs = [['000', '101', '010', '111'], ['0000', '1001', '0110', '1111'], ['00000', '10001', '01110', '11111']], [3, 4, 5]
+
     if choice == 'probabilities':
         H = math.sqrt(1 / 2) * np.array([[1],[-1]])
         temp = np.copy(H)
         for x in range(qubits - 1):
             temp = np.kron(temp, H)
         return temp
+
     elif choice == 'fidelities':
-        H_0 = math.sqrt(1 / 2) * np.array([[1], [1]])
-        H_1 = math.sqrt(1 / 2) * np.array([[1], [-1]])
-        choices, qs = [['000', '101', '010', '111'], ['0000', '1001', '0110', '1111'], ['00000', '10001', '01110', '11111']], [3, 4, 5]
         bin = choices[qs.index(qubits)][dex]
-        hadamards = []
-        for x in bin:
-            if x == '0':
-                hadamards.append(H_0)
-            else:
-                hadamards.append(H_1)
-        last = hadamards[-1]
-        for x in reversed(hadamards[:-1]):
-            last = np.kron(x, last)
-        return last
+        h = np.array([[1, 1],[1, -1]]) * math.sqrt(1 / 2)
+        hadamard = h.copy()
+        for x in range(qubits - 1):
+            hadamard = np.kron(hadamard, h)
+        index = int(bin, 2)
+        starting_vector = np.zeros((2 ** qubits, 1))
+        starting_vector[index, 0] += 1
+        starting_vector = hadamard.dot(starting_vector)
+        return starting_vector
 
 
 def apply_circuit(state, circuit):
@@ -290,8 +280,7 @@ def write_data(vec, loc):
 
 
 def get_altered(alt, dex, alg, index, qubits, ry_dex, psi0, gate_type):
-    # alter one gate
-
+    # Alter one gate of chosen type, find ending state
     if "Hadamard" in gate_type or "CNOT" in gate_type or "X" in gate_type or "CZ" in gate_type:
         altered_gate = alg(index, None, True, qubits)
     else:
@@ -304,15 +293,16 @@ def get_altered(alt, dex, alg, index, qubits, ry_dex, psi0, gate_type):
 
 # Data Gathering ==================================================================#
 
-def dis(state1, state2, n):
-    stateA = qt.Qobj(state1)
-    stateB = qt.Qobj(state2)
-    fid=qt.fidelity(stateA, stateB)
-    p_0 = 1/n + (n-1)*fid/n
+def dis(state1,state2, n):
+    # had to verify what the original formula was doing
+    # find probability of |0> for ancilla
+    overlap = list(np.real(np.dot(np.conj(np.array(state1).T), np.array(state2)) * np.dot(np.conj(np.array(state2).T), state1)))[0]
+    p_0 = 0.5 + 0.5 * overlap
     return p_0
 
 
 def check_for_duplicates(check_dups, vec):
+    # check a current vector against other found vectors to prevent duplicates
     for x in check_dups:
         eqs = 0
         for y in range(len(vec)):
@@ -338,6 +328,7 @@ def recursive_duplicate_hunter(start, check_dups, alt, dex, alg, index, qubits, 
 
 def recursive_fidelity_hunter(start, check_dups, dex, alg, index, qubits, ry_dex, gate_type, circuit):
     # duplicate hunter for fidelities data
+    # repeatedly looks for new vectors if the options get sparse
     vector = []
     alt = circuit.copy()
     for i in range(4):
@@ -365,8 +356,10 @@ def gather_probabilities_data(pop, circuit, tags, indices, qubits, loc, classes)
     check_dups, vecs = [], []
 
     for run in range(pop):
+        # run through an error on each individual gate
         ry_dex = 1
         for dex in range(depth):
+            # find final probabilities vector with altered gate
             psi0 = get_starting_state(qubits, 'probabilities', None)
             gate_type = tags[dex]
             index = indices[dex]
@@ -391,6 +384,7 @@ def gather_probabilities_data(pop, circuit, tags, indices, qubits, loc, classes)
                 print(new_data_vec)
                 write_data(new_data_vec, loc)
 
+    # find the ideal vector for comparison
     last_start = get_starting_state(qubits, 'probabilities', None)
     ideal_vec = apply_circuit(last_start, circuit).T.tolist()
     ideal_vec = np.real(np.conj(ideal_vec) * np.array(ideal_vec))
@@ -408,8 +402,10 @@ def diagnostic_fidelity_circuit(pop, circuit, tags, indices, qubits, loc, classe
     check_dups, vecs = [], []
 
     for run in range(pop):
+        # run through an error on each individual gate
         ry_dex = 1
         for dex in range(depth):
+            # find vector of p(|0>) from the four chosen basis states with altered gate at index dex
             gate_type = tags[dex]
             index = indices[dex]
             alg = alt_algs[gate_types.index(gate_type)]
@@ -437,13 +433,14 @@ def diagnostic_fidelity_circuit(pop, circuit, tags, indices, qubits, loc, classe
                 print(new_data_vec)
                 write_data(new_data_vec, loc)
 
+    # find ideal vector for comparison
     ideal_vector = []
     for i in range(4):
         psi0 = get_starting_state(qubits, 'fidelities', i)
         reference = psi0.copy()
         state_fin = apply_circuit(psi0, circuit)
         distance = dis(state_fin, reference, 2 ** qubits)
-        ideal_vector.append(distance)
+        ideal_vector.append(list(distance)[0])
     print("Ideal: ", ideal_vector)
 
     return vecs
@@ -453,12 +450,18 @@ def main():
 
     circ_algs = [teleportation_circuit, w_state_circuit, ghz_circuit, repeater_circuit, one_qubit_adder]
     circs = ['teleport', 'wstate', 'ghz', 'repeater', 'adder']
+    # Ask many questions
     circ_choice = str(input('Which circuit? (teleport, wstate, ghz, repeater, adder)'))
     metric_choice = str(input('Which metric are you using? (probabilities, fidelities)'))
     pop = int(input('How many errors per gate?'))
     loc = circ_choice + '_' + str(pop) + metric_choice + '_.csv'
+    # print stored location
     print(loc)
+
+    # fetch the circuit stuff
     qubits, circuit, indices, tags, classes = circ_algs[circs.index(circ_choice)]()
+
+    # gather data
     if metric_choice == 'probabilities':
         gather_probabilities_data(pop, circuit, tags, indices, qubits, loc, classes)
     else:
