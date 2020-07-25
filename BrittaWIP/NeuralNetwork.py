@@ -92,32 +92,33 @@ def make_dataset(path):
     rows_train = len(train_set)
     rows_test = len(test_set)
     csvfile.close()
+    rows = min([rows_test, rows_train])
     write_data('sim_data/train.csv', train_set)
     write_data('sim_data/test.csv', test_set)
-    train_set_fin = tf.data.experimental.make_csv_dataset('sim_data/train.csv', rows_train,
+    train_set_fin = tf.data.experimental.make_csv_dataset('sim_data/train.csv', rows,
                                                     column_names=column_names,
                                                     label_name=label_name[0],
                                                     num_epochs=1,
                                                     shuffle=True)
-    test_set_fin = tf.data.experimental.make_csv_dataset('sim_data/test.csv', rows_test,
+    test_set_fin = tf.data.experimental.make_csv_dataset('sim_data/test.csv', rows,
                                                     column_names=column_names,
                                                     label_name=label_name[0],
                                                     num_epochs=1,
                                                     shuffle=True)
-    return train_set_fin, test_set_fin, rows_train
+    return train_set_fin, test_set_fin, rows
 
 
-def make_unknown_dataset(unknown_path):
+def make_unknown_dataset(unknown_path, rows):
     # Reads the unknown data
-    length = 0
+    #length = 0
     with open(unknown_path, 'r') as csvfile:
         lines = csv.reader(csvfile, quoting=csv.QUOTE_NONNUMERIC)
         data = list(lines)
-        length += len(data)
+        #length += len(data)
     csvfile.close()
     print(label_name[0])
 
-    dataset = tf.data.experimental.make_csv_dataset(unknown_path, length,
+    dataset = tf.data.experimental.make_csv_dataset(unknown_path, rows,  ##################
                                                     column_names=column_names,
                                                     label_name=label_name[0],
                                                     num_epochs=1,
@@ -148,7 +149,6 @@ def make_model(train_dataset, rows, classnum, choice, metric_choice):
             tf.keras.layers.Dense(75, activation='swish', kernel_regularizer=tf.keras.regularizers.l2(l=0.9)),
             tf.keras.layers.Dense(classnum, kernel_regularizer = tf.keras.regularizers.l2(l=0.9))])
             return model, features, labels, train_dataset
-
             #raise
         elif metric_choice == 'fidelities':
             model = tf.keras.Sequential([tf.keras.layers.Flatten(),
@@ -178,28 +178,19 @@ def make_model(train_dataset, rows, classnum, choice, metric_choice):
             tf.keras.layers.Dropout(.05)
             return model, features, labels, train_dataset
 
-            #raise
         elif metric_choice == 'fidelities':
             kreg = tf.keras.regularizers.l2(l=0.2)  # 0.08
             model = tf.keras.Sequential()
-            tf.keras.layers.LayerNormalization(
-                axis=-1, epsilon=0.001, center=True, scale=True, beta_initializer='zeros',
-                gamma_initializer='ones', beta_regularizer=None, gamma_regularizer=None,
-                beta_constraint=None, gamma_constraint=None, trainable=True, name=None)
             model.add(tf.keras.layers.Flatten())
-            model.add(tf.keras.layers.Dense(64, activation='swish', activity_regularizer=kreg, input_shape=(rows, 8)))
-            tf.keras.layers.Dropout(.05)
-            model.add(tf.keras.layers.Dense(64, activation='swish', activity_regularizer=kreg, input_shape=(rows, 8)))
-            tf.keras.layers.Dropout(.05)
-            model.add(tf.keras.layers.Dense(64, activation='swish', activity_regularizer=kreg, input_shape=(rows, 8)))
-            tf.keras.layers.Dropout(.05)
-            model.add(tf.keras.layers.Dense(64, activation='swish', activity_regularizer=kreg, input_shape=(rows, 8)))
-            tf.keras.layers.Dropout(.05)
+            model.add(tf.keras.layers.Dense(35, activation='swish', activity_regularizer=kreg, input_shape=(rows, 8)))
+            model.add(tf.keras.layers.Dropout(.05))
+            model.add(tf.keras.layers.Dense(25, activation='swish', activity_regularizer=kreg, input_shape=(rows, 8)))
+            model.add(tf.keras.layers.Dropout(.05))
+            model.add(tf.keras.layers.Dense(7, activation='swish', activity_regularizer=kreg, input_shape=(rows, 8)))
             return model, features, labels, train_dataset
 
     elif choice == 'Teleportation':
         if metric_choice == 'probabilities':
-
             kreg = tf.keras.regularizers.l2(l=0.2)
             model = tf.keras.Sequential()
             tf.keras.layers.LayerNormalization(
@@ -215,70 +206,59 @@ def make_model(train_dataset, rows, classnum, choice, metric_choice):
             model.add(tf.keras.layers.Dense(24, activation='swish', activity_regularizer=kreg, input_shape=(rows, 8)))
             tf.keras.layers.Dropout(.05)
             return model , features, labels, train_dataset
-
-            #raise
         elif metric_choice == 'fidelities':
+
             model = tf.keras.Sequential([tf.keras.layers.Flatten(),
-            tf.keras.layers.Dense(250, activation='swish', input_shape=(rows, 6), kernel_regularizer=tf.keras.regularizers.l2(l=0.9)),
-            tf.keras.layers.Dense(150, activation='swish', kernel_regularizer=tf.keras.regularizers.l2(l=0.9)),
-            tf.keras.layers.Dense(75, activation='swish', kernel_regularizer=tf.keras.regularizers.l2(l=0.9)),
-            tf.keras.layers.Dense(classnum, kernel_regularizer=tf.keras.regularizers.l2(l=0.9))])
+                                         tf.keras.layers.Dense(250, activation='swish', input_shape=(rows, 6),
+                                                               kernel_regularizer=tf.keras.regularizers.l2(l=0.9)),
+                                         tf.keras.layers.Dense(150, activation='swish', kernel_regularizer=tf.keras.regularizers.l2(l=0.9)),
+                                         tf.keras.layers.Dense(75, activation='swish', kernel_regularizer=tf.keras.regularizers.l2(l=0.9)),
+                                         tf.keras.layers.Dense(classnum, kernel_regularizer=tf.keras.regularizers.l2(l=0.9))])
             return model, features, labels, train_dataset
 
     elif choice == "WState":
         if metric_choice == 'probabilities':
-
-            kreg = tf.keras.regularizers.l2(l=0.02)  # 0.08
-            model = tf.keras.Sequential()
-            tf.keras.layers.LayerNormalization(
-                axis=-1, epsilon=0.001, center=True, scale=True, beta_initializer='zeros',
-                gamma_initializer='ones', beta_regularizer=None, gamma_regularizer=None,
-                beta_constraint=None, gamma_constraint=None, trainable=True, name=None
-            )
-            model.add(tf.keras.layers.Flatten())
-            model.add(tf.keras.layers.Dense(64, activation='swish', activity_regularizer=kreg, input_shape=(rows, 8)))
-            #tf.keras.layers.Dropout(.05)
-            model.add(tf.keras.layers.Dense(64, activation='swish', activity_regularizer=kreg, input_shape=(rows, 8)))
-            #tf.keras.layers.Dropout(.05)
-            model.add(tf.keras.layers.Dense(64, activation='swish', activity_regularizer=kreg, input_shape=(rows, 8)))
-            #tf.keras.layers.Dropout(.05)
+            model = tf.keras.Sequential([tf.keras.layers.Flatten(),
+                                         tf.keras.layers.Dense(35, activation='swish', input_shape=(rows, 6),
+                                                               kernel_regularizer=tf.keras.regularizers.l2(l=0.9)),
+                                         tf.keras.layers.Dense(25, activation='swish', kernel_regularizer=tf.keras.regularizers.l2(l=0.9)),
+                                         tf.keras.layers.Dense(7, activation='swish', kernel_regularizer=tf.keras.regularizers.l2(l=0.9)),
+                                         tf.keras.layers.Dense(classnum, kernel_regularizer=tf.keras.regularizers.l2(l=0.9))])
             return model, features, labels, train_dataset
-
             #raise
         elif metric_choice == 'fidelities':
-            kreg = tf.keras.regularizers.l2(l=0.2)  # 0.08
+            model = tf.keras.Sequential([tf.keras.layers.Flatten(),
+                                         tf.keras.layers.Dense(35, activation='swish', input_shape=(rows, 6),
+                                                               kernel_regularizer=tf.keras.regularizers.l2(l=0.9)),
+                                         tf.keras.layers.Dense(25, activation='swish', kernel_regularizer=tf.keras.regularizers.l2(l=0.9)),
+                                         tf.keras.layers.Dense(7, activation='swish', kernel_regularizer=tf.keras.regularizers.l2(l=0.9)),
+                                         tf.keras.layers.Dense(classnum, kernel_regularizer=tf.keras.regularizers.l2(l=0.9))])
+            """
+            kreg = tf.keras.regularizers.l2(l=0.02)  # 0.08
             model = tf.keras.Sequential()
-            tf.keras.layers.LayerNormalization(
-                axis=-1, epsilon=0.001, center=True, scale=True, beta_initializer='zeros',
-                gamma_initializer='ones', beta_regularizer=None, gamma_regularizer=None,
-                beta_constraint=None, gamma_constraint=None, trainable=True, name=None
-            )
             model.add(tf.keras.layers.Flatten())
+            model.add(tf.keras.layers.Dense(256, activation='swish', activity_regularizer=kreg, input_shape=(rows, 8)))
+            #model.add(tf.keras.layers.Dropout(.05))
             model.add(tf.keras.layers.Dense(64, activation='swish', activity_regularizer=kreg, input_shape=(rows, 8)))
-            tf.keras.layers.Dropout(.05)
-            model.add(tf.keras.layers.Dense(64, activation='swish', activity_regularizer=kreg, input_shape=(rows, 8)))
-            tf.keras.layers.Dropout(.05)
-            model.add(tf.keras.layers.Dense(64, activation='swish', activity_regularizer=kreg, input_shape=(rows, 8)))
-            tf.keras.layers.Dropout(.05)
+            #model.add(tf.keras.layers.Dropout(.05))
+            model.add(tf.keras.layers.Dense(32, activation='swish', activity_regularizer=kreg, input_shape=(rows, 8)))
+            #model.add(tf.keras.layers.Dropout(.05))
+            model.add(tf.keras.layers.Dense(16, activation='swish', activity_regularizer=kreg, input_shape=(rows, 8)))
+            #model.add(tf.keras.layers.Dropout(.05))
+            """
             return model, features, labels, train_dataset
-
     elif choice == "Adder":
         if metric_choice == 'probabilities':
 
             kreg = tf.keras.regularizers.l2(l=0.2)  # 0.08
             model = tf.keras.Sequential()
-            tf.keras.layers.LayerNormalization(
-                axis=-1, epsilon=0.001, center=True, scale=True, beta_initializer='zeros',
-                gamma_initializer='ones', beta_regularizer=None, gamma_regularizer=None,
-                beta_constraint=None, gamma_constraint=None, trainable=True, name=None
-            )
             model.add(tf.keras.layers.Flatten())
             model.add(tf.keras.layers.Dense(64, activation='swish', activity_regularizer=kreg, input_shape=(rows, 8)))
-            tf.keras.layers.Dropout(.05)
+            #model.add(tf.keras.layers.Dropout(.05))
             model.add(tf.keras.layers.Dense(64, activation='swish', activity_regularizer=kreg, input_shape=(rows, 8)))
-            tf.keras.layers.Dropout(.05)
+            #model.add(tf.keras.layers.Dropout(.05))
             model.add(tf.keras.layers.Dense(64, activation='swish', activity_regularizer=kreg, input_shape=(rows, 8)))
-            tf.keras.layers.Dropout(.05)
+            #model.add(tf.keras.layers.Dropout(.05))
             return model, features, labels, train_dataset
 
             #raise
@@ -306,7 +286,6 @@ def make_model(train_dataset, rows, classnum, choice, metric_choice):
 def loss(model, x, y):
     y = np.int_(y.numpy())
     tf.convert_to_tensor(y)
-
     y_ = model(x)
     loss_object = tf.losses.sparse_softmax_cross_entropy(labels=y, logits=y_,)
     return loss_object
@@ -318,8 +297,6 @@ def loss(model, x, y):
 def grad(model, inputs, targets):
     with tf.GradientTape() as tape:
         loss_value = loss(model, inputs, targets)
-
-
     grads = tape.gradient(loss_value, model.trainable_variables)
     grads = tf.distribute.get_replica_context().all_reduce('sum', grads)
     return loss_value, grads
@@ -332,12 +309,13 @@ def optimize(choice, metric_choice):
     # Params get tuned here, obviously some still in progress
 
     if choice == 'WState':
-        if metric_choice == 'probabilities':
-            optimizer = tf.compat.v1.train.RMSPropOptimizer(0.009, decay=0.06, momentum=0.1, epsilon=1e-10, use_locking=False, centered=True, name='RMSProp')
+        if metric_choice == 'probabilities': # DONT TOUCH
+            optimizer = tf.compat.v1.train.RMSPropOptimizer(0.0009, decay=0.06, momentum=0.1, epsilon=1e-10, use_locking=False, centered=True, name='RMSProp')
             return optimizer
             #raise
-        elif metric_choice == 'fidelities':
-            optimizer = tf.keras.optimizers.SGD(learning_rate=.09, nesterov=True, momentum=.9)
+        elif metric_choice == 'fidelities': #  DONNNT TOUUUCH
+            optimizer = tf.compat.v1.train.RMSPropOptimizer(0.00009, decay=0.03, momentum=0.09, epsilon=1e-10, use_locking=False, centered=True, name='RMSProp')
+
             return optimizer
 
     elif choice == 'Teleportation':
@@ -345,8 +323,9 @@ def optimize(choice, metric_choice):
             optimizer = tf.compat.v1.train.RMSPropOptimizer(0.00095, decay=0.06, momentum=0.01, epsilon=1e-10, use_locking=False, centered=True, name='RMSProp')
             return optimizer
             #raise
-        elif metric_choice == 'fidelities':
-            optimizer = tf.compat.v1.train.RMSPropOptimizer(0.00005, decay=0.06, momentum=0.1, epsilon=1e-10, use_locking=False, centered=True, name='RMSProp')
+        elif metric_choice == 'fidelities': ######
+            optimizer = tf.compat.v1.train.RMSPropOptimizer(0.0009, decay=0.03, momentum=0.1, epsilon=1e-10, use_locking=False, centered=True, name='RMSProp')
+
             return optimizer
 
     elif choice == 'GHZ':
@@ -359,17 +338,16 @@ def optimize(choice, metric_choice):
             return optimizer
 
     elif choice == 'Repeater':
-        if metric_choice == 'probabilities':
+        if metric_choice == 'probabilities': # DONT TOUCH
             optimizer = tf.compat.v1.train.RMSPropOptimizer(0.0009, decay=0.06, momentum=0.1, epsilon=1e-10, use_locking=False,centered=True, name='RMSProp')
             return optimizer
-            #raise
         elif metric_choice == 'fidelities':
-            optimizer = tf.compat.v1.train.RMSPropOptimizer(0.0005, decay=0.06, momentum=0.1, epsilon=1e-10, use_locking=False, centered=True, name='RMSProp')
+            optimizer = tf.compat.v1.train.RMSPropOptimizer(0.0007, decay=0.06, momentum=0.1, epsilon=1e-10, use_locking=False, centered=True, name='RMSProp')
             return optimizer
 
     elif choice == 'Adder':
         if metric_choice == 'probabilities':
-            optimizer = tf.compat.v1.train.RMSPropOptimizer(0.009, decay=0.06, momentum=0.1, epsilon=1e-10, use_locking=False, centered=True, name='RMSProp')
+            optimizer = tf.compat.v1.train.RMSPropOptimizer(0.0001, decay=0.06, momentum=0.1, epsilon=1e-10, use_locking=False, centered=True, name='RMSProp')
             return optimizer
             #raise
         elif metric_choice == 'fidelities':
@@ -378,11 +356,10 @@ def optimize(choice, metric_choice):
 
 #===============================================================================#
 
-def train_model(train_dataset,model,optimizer):
+def train_model(train_dataset,model,optimizer, num_epochs):
 
     train_loss_results, train_accuracy_results = [], []
 
-    num_epochs = 700
     for epoch in range(num_epochs):
         epoch_loss_avg = tf.keras.metrics.Mean()
         epoch_accuracy = tf.keras.metrics.SparseCategoricalAccuracy()
@@ -474,22 +451,26 @@ def plotter(train_accuracy_results,train_loss_results):
 #===============================================================================#
 
 def build_and_run(train_dataset, test_dataset, unknown_dataset, mapper,
-                  rows, batchsize, choice, predictions_total, metric_choice):
+                  rows, batchsize, choice, predictions_total, metric_choice, num_epochs):
 
     model, features, labels, train_dataset = make_model(train_dataset, rows, batchsize, choice, metric_choice)
     grad(model, features, labels)
     optimizer = optimize(choice, metric_choice)
 
-    train_model(train_dataset, model, optimizer)
+    train_model(train_dataset, model, optimizer, num_epochs)
 
     #plotter(acc_results, loss_results)
     predictions, targets = test_run(test_dataset, model)
     #print_results(predictions, targets, mapper)
+
+    # saves the predictions on the unknown datasets over multiple calls of build_and_run
+    # so the final answer is an average
     predictions_converted = predict(unknown_dataset, model, mapper)
     predictions_total.append(predictions_converted)
 
 
 def designate_predictions(predictions_total):
+    # Find the overall frequency of class predictions on the unknown data
 
     print("Predicting Unknowns....")
     count = 0
@@ -513,15 +494,21 @@ def designate_predictions(predictions_total):
 
 metric_choices = ['probabilities', 'fidelities']
 choices = ["Teleportation", "WState", "GHZ", "Repeater", "Adder"]
-batchsizes_probs = [60, 60, 60, 80, 60]
-batchsizes_fids = [60, 100, 20, 20, 20]
+#batchsizes_probs = [60, 60, 60, 80, 60]
+#batchsizes_fids = [60, 100, 20, 20, 20]
+batchsizes_probs = [100, 60, 60, 60, 100]
+batchsizes_fids = [100, 100, 60, 60, 60]
+epochs_probs = [1000, 2000, 600, 600, 600]
+epochs_fids = [1700, 4000, 600, 600, 600] # check all these
 batchsizes_choice = [batchsizes_probs, batchsizes_fids]
+epochs_choice = [epochs_probs, epochs_fids]
 
 def main(path, choice, unknown_path, metric_choice):
 
     cnames = [column_names_list_prob[choices.index(choice)], column_names_list_fid[choices.index(choice)]]
     batchsize_list = batchsizes_choice[metric_choices.index(metric_choice)]
     batchsize = batchsize_list[choices.index(choice)]
+    num_epochs = epochs_choice[metric_choices.index(metric_choice)][choices.index(choice)]
     mapper = maps[choices.index(choice)]
     column_names_temp = cnames[metric_choices.index(metric_choice)]
     count = 0
@@ -534,106 +521,109 @@ def main(path, choice, unknown_path, metric_choice):
         count += 1
     print(column_names_temp)
     train_dataset, test_dataset, rows = make_dataset(path)
-    unknown_dataset = make_unknown_dataset(unknown_path)
+    unknown_dataset = make_unknown_dataset(unknown_path, rows)
 
     predictions_total = []
+    # predictions on unknowns append to predictions_total
     for x in range(3):
         build_and_run(train_dataset, test_dataset, unknown_dataset, mapper,
-                      rows, batchsize, choice, predictions_total, metric_choice)
+                      rows, batchsize, choice, predictions_total, metric_choice, num_epochs)
 
-    # predict which errors are present in unknown data
+    # predict which errors are present in unknown data from the 3 runs combined
     designate_predictions(predictions_total)
 
+    # remove the temporary file needed to avoid using split_data_files
+    # this does not happen till the very end
     os.remove('sim_data/train.csv')
     os.remove('sim_data/test.csv')
 
 
 
-unknown_path = "ibm_data/teleport100_ibm_sim_fidelitiesibmq_16_melbourne.csv"
-path = "sim_data/teleport_100fidelities_.csv"
-main(path, 'Teleportation', unknown_path, 'fidelities')
+unknown_path = "ibm_data/repeater100_ibm_sim_fidelitiesibmq_16_melbourne.csv"
+path = "sim_data/repeater_600fidelities_.csv"
+main(path, 'Repeater', unknown_path, 'fidelities')
 
 
-""" Results 7. 18. 20 
-
-
+""" Results 7. 25. 20 
 "WState" (fidelities) wstate100_ibm_sim_fidelitiesibmq_16_melbourne.csv ; wstate_100fidelities_.csv 
-Run1: Train Accuracy: 65.602% ; Test set accuracy: 60.424% 
-Run2: Train Accuracy: 62.218% ; Test set accuracy: 59.011% 
-Run3: Train Accuracy: 65.789% ; Test set accuracy: 59.717% 
+Run1: Train Accuracy: 77.380% ; Test set accuracy: 76.410%
+Run2: Train Accuracy: 76.653% ; Test set accuracy: 74.894%  DONE 
+Run3: Train Accuracy: 75.500% ; Test set accuracy: 75.076% 
 Predicting Unknowns....
-CNOT : 1.0
-"WState" (probabilities) wstate100_ibm_sim_probabilities_ibmq_16_melbourne.csv ; wstate_100probabilities_.csv 
-Run1: Train Accuracy: 76.923% ; Test set accuracy: 82.655% 
-Run2: Train Accuracy: 77.111% ; Test set accuracy: 79.115% 
-Run3: Train Accuracy: 58.161% ; Test set accuracy: 58.230% 
+CNOT : 0.9494949494949495
+RY : 0.04377104377104377
+X : 0.006734006734006734
+"WState" (probabilities) "ibm_data/wstate100_ibm_sim_probabilities_ibmq_16_melbourne.csv" ; "sim_data/wstate_300probabilities_.csv" 
+Run1: Train Accuracy: 97.452% ; Test set accuracy: 97.217%
+Run2: Train Accuracy: 96.448% ; Test set accuracy: 95.898%  DONE 
+Run3: Train Accuracy: 96.803% ; Test set accuracy: 93.723% 
 Predicting Unknowns....
+CNOT : 0.5050505050505051
 X : 0.3367003367003367
-RY : 0.27946127946127947
-CNOT : 0.3838383838383838
+RY : 0.15824915824915825
 
-
-"GHZ" (fidelities)
-Run1: Train Accuracy: 100.000% ; Test set accuracy: 98.010%
-Run2: Train Accuracy: 100.000% ; Test set accuracy: 98.010% 
-Run3: Train Accuracy: 100.000% ; Test set accuracy: 98.010%
+"GHZ" (fidelities) "ibm_data/ghz100_ibm_sim_fidelitiesibmq_16_melbourne.csv" ; "sim_data/ghz_300fidelities_.csv"
+Run1: Train Accuracy: 99.669% ; Test set accuracy: 94.604%
+Run2: Train Accuracy: 99.669% ; Test set accuracy: 99.831% DONE 
+Run3: Train Accuracy: 99.669% ; Test set accuracy: 99.494%
 Predicting Unknowns....
 CNOT : 1.0
-"GHZ" (probabilities) ghz100_ibm_sim_probabilities_ibmq_16_melbourne.csv ;  ghz_100probabilities_.csv
-Run1: Train Accuracy: 82.524% ; Test set accuracy: 89.062% 
-Run2: Train Accuracy: 93.204% ; Test set accuracy: 86.979%
-Run3: Train Accuracy: 90.291% ; Test set accuracy: 93.229% 
-Predicting Unknowns....
-HADAMARD : 0.7205387205387206
-CNOT : 0.27946127946127947
-
-
-"Repeater" (fidelities) repeater100_ibm_sim_fidelitiesibmq_16_melbourne.csv ; repeater_40fidelities_.csv 
-Run1: Train Accuracy: 75.841% ; Test set accuracy: 71.386% 
-Run2: Train Accuracy: 75.229% ; Test set accuracy: 74.699% 
-Run3: Train Accuracy: 76.300% ; Test set accuracy: 69.880% 
+"GHZ" (probabilities) "ibm_data/ghz100_ibm_sim_probabilities_ibmq_16_melbourne.csv" ; "sim_data/ghz_300probabilities_.csv"
+Run1: Train Accuracy: 96.713% ; Test set accuracy: 96.774%
+Run2: Train Accuracy: 95.484% ; Test set accuracy: 91.869% DONE 
+Run3: Train Accuracy: 96.713% ; Test set accuracy: 96.774%
 Predicting Unknowns....
 HADAMARD : 1.0
-"Repeater" (probabilities) repeater100_ibm_sim_probabilities_ibmq_16_melbourne.csv ; repeater_40probabilities_.csv
-Run1: Train Accuracy: 74.682% ; Test set accuracy: 70.725%
-Run2: Train Accuracy: 87.102% ; Test set accuracy: 83.043%
-Run3: Train Accuracy: 77.070% ; Test set accuracy: 72.609%
-Predicting Unknowns....
-HADAMARD : 0.9865319865319865
-CNOT : 0.013468013468013467
 
-Adder(fidelities) adder100_ibm_sim_fidelitiesibmq_16_melbourne.csv ; adder_60fidelities_.csv
-Run1: Train Accuracy: 88.953% ; Test set accuracy: 89.247% 
-Run2: Train Accuracy: 86.628% ; Test set accuracy: 90.860%
-Run3: Train Accuracy: 86.628% ; Test set accuracy: 89.785%
+
+"Repeater" (probabilities) "ibm_data/repeater100_ibm_sim_probabilities_ibmq_16_melbourne.csv" ; "sim_data/repeater_300probabilities_.csv"
+Run1: Train Accuracy: 91.361% ; Test set accuracy: 82.585%
+Run2: Train Accuracy: 95.458% ; Test set accuracy: 83.730% DONE
+Run3: Train Accuracy: 93.218% ; Test set accuracy: 91.242%
+Predicting Unknowns....
+CNOT : 0.9932659932659933
+HADAMARD : 0.006734006734006734
+"Repeater" (fidelities) "ibm_data/repeater100_ibm_sim_fidelitiesibmq_16_melbourne.csv" ; "repeater_600fidelities_.csv"
+Run1: 69.085% ; Test set accuracy: 61.082%  # Have not found a better way for repeater fid.
+Run2: 66.969% ; Test set accuracy: 62.480%  
+Run3: 69.448% ; Test set accuracy: 60.677%
+Predicting Unknowns....
+HADAMARD : 0.9966499162479062
+CNOT : 0.0033500837520938024
+
+
+Adder(fidelities) "ibm_data/adder100_ibm_sim_fidelitiesibmq_16_melbourne.csv"; "sim_data/adder_300fidelities_.csv"
+Run1: Train Accuracy: 93.610% ; Test set accuracy: 93.598%
+Run2: Train Accuracy: 91.704% ; Test set accuracy: 93.598%  # Check for accidentally changed parameters
+Run3: Train Accuracy: 94.058% ; Test set accuracy: 94.150%
 Predicting Unknowns....
 CNOT : 1.0
-"Adder" (probabilities) adder100_ibm_sim_probabilities_ibmq_16_melbourne.csv; adder_60probabilities_.csv 
+"Adder" (probabilities) "ibm_data/adder100_ibm_sim_probabilities_ibmq_16_melbourne.csv"; "sim_data/adder_300probabilities_.csv"
 # Adder will probably be altered to break down the toffolis into classes
 # Since a toffoli is full of cnots..
-Run1: Train Accuracy: 100.000% ; Test set accuracy: 97.159%
-Run2: Train Accuracy: 100.000% ; Test set accuracy: 94.886% 
-Run3: Train Accuracy: 100.000% ; Test set accuracy: 93.750% 
+Run1: Train Accuracy: 94.609% ; Test set accuracy: 93.813% 
+Run2: Train Accuracy: 93.509% ; Test set accuracy: 94.488%  # Check for accidentally changed parameters 
+Run3: Train Accuracy: 93.069% ; Test set accuracy: 93.251% 
 Predicting Unknowns....
-TOFFOLI : 0.3265993265993266
-CNOT : 0.6734006734006734
+CNOT : 0.9797979797979798
+TOFFOLI : 0.020202020202020204
 
-# Teleport is hard to tune...
+
 "Teleportation" (fidelities) teleport100_ibm_sim_fidelitiesibmq_16_melbourne.csv ; teleport_100fidelities_.csv 
-Run1: Train Accuracy: 49.716% ; Test set accuracy: 34.393%
-Run2: Train Accuracy: 46.875% ; Test set accuracy: 44.509% 
-Run3: Train Accuracy: 49.432% ; Test set accuracy: 39.595%
+Run1: Train Accuracy: 81.283% ; Test set accuracy: 78.682%
+Run2: Train Accuracy: 85.625% ; Test set accuracy: 58.024%  # Check for accidentally changed parameters
+Run3: Train Accuracy: 84.563% ; Test set accuracy: 82.871%
 Predicting Unknowns....
-HADAMARD : 1.0
+CNOT : 0.9461279461279462
+HADAMARD : 0.05387205387205387
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~#
 "Teleportation" (probabilities) teleport100_ibm_sim_probabilities_ibmq_16_melbourne.csv ; teleport_100probabilities_.csv
-Run1: Train Accuracy: 86.957% ; Test set accuracy: 87.819%
-Run2: Train Accuracy: 88.986% ; Test set accuracy: 89.802%
-Run3: Train Accuracy: 73.043% ; Test set accuracy: 69.972%
+Run1: Train Accuracy: 85.687% ; Test set accuracy: 84.295%
+Run2: Train Accuracy: 85.879% ; Test set accuracy: 84.295%  # Check for accidentally changed parameters
+Run3: Train Accuracy: 84.918% ; Test set accuracy: 83.728%
 Predicting Unknowns....
-HADAMARD : 0.8922558922558923
-CNOT : 0.08417508417508418
-CZ : 0.02356902356902357
-
+HADAMARD : 0.8013468013468014
+CNOT : 0.19865319865319866
 """
 
 
