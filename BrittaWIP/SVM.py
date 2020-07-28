@@ -10,22 +10,27 @@ from sklearn.metrics import accuracy_score
 
 # The data is not scaled because the sklearn scalers do something messed up to the results.
 
+#===================================================================Broad Gate Classification=============================
+# Easier circuits are run together, harder circuits run separately
+
+"""
+# would need to be uncommented 
 repeater = {'0':"HADAMARD",'1':"CNOT"}
 ghz = {'0':'HADAMARD', '1':'CNOT'}
 teleport = {"0":"HADAMARD", '1':"CNOT", '2':"CZ"}
 w_state = {'0':"RY", '1':"X", '2':"CNOT"}
 adder = {'0':"TOFFOLI", '1':"CNOT"}
+"""
 
-# Easier circuits are run together, harder circuits run separately
 # Repeater
-
+"""
 files = [('sim_data/by_class/repeater_600fidelities_.csv', 'ibm_data/repeater100_ibm_sim_fidelitiesibmq_16_melbourne.csv'),
          ('sim_data/by_class/repeater_300probabilities_.csv', 'ibm_data/repeater100_ibm_sim_probabilities_ibmq_16_melbourne.csv')]
          
 circ_names = ['Repeater', 'Repeater']
 maps = [ repeater, repeater]
 metrics = ['fidelities', 'probabilities']
-
+"""
 # WState
 """
 files = [('sim_data/by_class/wstate_300fidelities_.csv', 'ibm_data/wstate100_ibm_sim_fidelitiesibmq_16_melbourne.csv'),
@@ -35,6 +40,17 @@ circ_names = ['WState', 'WState']
 maps = [w_state, w_state]
 metrics = ['fidelities', 'probabilities']
 """
+
+# Last-minute add-on for deutsch-jozsa (whole gate classes )
+
+deutsch = {'0':'HADAMARD', '1':'X', '2':'CNOT'}
+files = [('sim_data/deutsch_300fidelities_.csv','ibm_data/deutsch100_ibm_sim_fidelitiesibmq_16_melbourne.csv'),
+        ('sim_data/deutsch_300probabilities_.csv','ibm_data/deutsch100_ibm_sim_probabilities_ibmq_16_melbourne.csv')]
+circ_names = ['Deutsch', 'Deutsch'] 
+maps = [deutsch, deutsch]
+metrics = ['fidelities', 'probabilities']
+
+
 
 # The Rest
 """
@@ -49,6 +65,34 @@ circ_names = ['GHZ', 'GHZ', 'Teleport', 'Teleport', 'Adder', 'Adder']
 maps = [ghz, ghz, teleport, teleport, adder, adder]
 metrics = ['fidelities', 'probabilities']*3
 """
+# ======================================================== Specific Gate Classification =============================================#
+"""
+ghz = {'0':"HADAMARD1", '1':"CNOT1", '2':"CNOT2", '3':"CNOT3"}
+wstate= {'0':"RY1", '1':"X1", '2':"X2", '3':"CNOT1", '4':"RY2", '5':"CNOT2", '6':"RY3", '7':"X3", '8':"X4", '9':"CNOT3", '10':"CNOT4"}
+adder = {'0':"TOFFOLI1", '1':"TOFFOLI2", '2':"TOFFOLI3", '3':"CNOT1", '4':"CNOT2", '5':"CNOT3"}
+
+files = [('sim_data/ghz_800fidelities_allgates_.csv', 'ibm_data/ghz100_ibm_sim_fidelitiesibmq_16_melbourne.csv'),
+         ('sim_data/ghz_800probabilities_allgates_.csv', 'ibm_data/ghz100_ibm_sim_probabilities_ibmq_16_melbourne.csv'),
+         ('sim_data/adder_800fidelities_allgates_.csv', 'ibm_data/adder100_ibm_sim_fidelitiesibmq_16_melbourne.csv'),
+         ('sim_data/adder_800probabilities_allgates_.csv', 'ibm_data/adder100_ibm_sim_probabilities_ibmq_16_melbourne.csv'),
+         ('sim_data/wstate_800fidelities_allgates_.csv', 'ibm_data/wstate100_ibm_sim_fidelitiesibmq_16_melbourne.csv'),
+         ('sim_data/wstate_800probabilities_allgates_.csv', 'ibm_data/wstate100_ibm_sim_probabilities_ibmq_16_melbourne.csv')]
+
+circ_names = ['GHZ', 'GHZ', 'Adder', 'Adder', 'WState', 'WState']
+maps = [ghz, ghz, adder, adder, wstate, wstate]
+metrics = ['fidelities', 'probabilities']*3
+"""
+# Last minute add-on for deutsch-jozsa (single gates)
+"""
+deutsch = {'0':'HADAMARD1', '1':'HADAMARD2', '2':'HADAMARD3', '3':'HADAMARD4', '4':'X1', '5':'HADAMARD5', '6':'X2', '7':'X3', '8':'CNOT1', '9':'X4',
+            '10':'CNOT2', '11':'CNOT3', '12':'X5', '13':'CNOT4', '14':'HADAMARD6', '15':'HADAMARD7', '16':'HADAMARD8', '17':'HADAMARD9'}
+files = [('sim_data/deutsch_800fidelities_allgates_.csv','ibm_data/deutsch100_ibm_sim_fidelitiesibmq_16_melbourne.csv'),
+        ('sim_data/deutsch_800probabilities_allgates_.csv','ibm_data/deutsch100_ibm_sim_probabilities_ibmq_16_melbourne.csv')]
+circ_names = ['Deutsch', 'Deutsch']
+maps = [deutsch, deutsch]
+metrics = ['fidelities', 'probabilities']
+"""
+# ======================================================== Code======================================================================#
 def handleDataset(filename, split, train_set=[], test_set=[]):
     data = []
     with open(filename, 'r') as csvfile:
@@ -83,7 +127,7 @@ def scale_data(train_set, test_set):
 
 def get_model(X_train, y_train):
 
-    svm = SVC(kernel='rbf', degree=3, gamma='auto', C=1000.0, decision_function_shape='ovr', class_weight='balanced', probability=True)
+    svm = SVC(kernel='poly', degree=3, gamma='auto', C=1000.0, decision_function_shape='ovr', class_weight='balanced', probability=True)
     svm.fit(X_train, y_train)
     return svm
 
@@ -213,5 +257,88 @@ Predicting Unknowns....
 HADAMARD : 0.69
 CNOT : 0.31
 Average Accuracy:  0.9462107690830701
+
+SVC(kernel='poly', degree=3, gamma='auto', C=1000.0, decision_function_shape='ovr', class_weight='balanced', probability=True)
+____________________________________
+Circuit: Deutsch ; Metric: fidelities
+Predicting Unknowns....
+HADAMARD : 0.645
+X : 0.355
+Average Accuracy:  0.5886900700245782
+____________________________________
+Circuit: Deutsch ; Metric: probabilities
+Predicting Unknowns....
+X : 0.5
+HADAMARD : 0.5
+Average Accuracy:  0.39278063265223107
+
+"""
+"""
+# ============ Specific gate errors ======
+
+____________________________________
+Circuit: GHZ ; Metric: fidelities
+Predicting Unknowns....
+CNOT2 : 0.45
+CNOT3 : 0.54
+CNOT1 : 0.01
+Average Accuracy:  0.9933331096121794
+____________________________________
+Circuit: GHZ ; Metric: probabilities
+Predicting Unknowns....
+CNOT2 : 0.33
+HADAMARD1 : 0.5
+CNOT1 : 0.1
+CNOT3 : 0.07
+Average Accuracy:  0.9954407294832827
+____________________________________
+Circuit: Adder ; Metric: fidelities
+Predicting Unknowns....
+CNOT2 : 1.0
+Average Accuracy:  0.9451607060528222
+____________________________________
+Circuit: Adder ; Metric: probabilities
+Predicting Unknowns....
+CNOT2 : 0.435
+TOFFOLI3 : 0.3
+CNOT1 : 0.23
+CNOT3 : 0.015
+TOFFOLI2 : 0.02
+Average Accuracy:  0.9751346979244127
+____________________________________
+Circuit: WState ; Metric: fidelities
+Predicting Unknowns....
+CNOT3 : 0.55
+X2 : 0.04
+CNOT4 : 0.265
+RY1 : 0.07
+CNOT2 : 0.065
+X1 : 0.01
+Average Accuracy:  0.7552322801338875
+____________________________________
+Circuit: WState ; Metric: probabilities
+Predicting Unknowns....
+X3 : 0.33
+CNOT4 : 0.545
+RY2 : 0.095
+CNOT2 : 0.02
+X1 : 0.01
+Average Accuracy:  0.956807539404833
+
+____________________________________
+Circuit: Deutsch ; Metric: fidelities
+Predicting Unknowns....
+X1 : 0.88
+HADAMARD6 : 0.075
+HADAMARD8 : 0.04
+HADAMARD7 : 0.005
+Average Accuracy:  0.378073774415016
+
+____________________________________
+Circuit: Deutsch ; Metric: probabilities
+Predicting Unknowns....
+CNOT1 : 0.5
+X2 : 0.5
+Average Accuracy:  0.0596547820747109
 
 """
