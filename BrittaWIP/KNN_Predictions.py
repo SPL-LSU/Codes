@@ -34,6 +34,7 @@ metrics = ['fidelities', 'probabilities']*5
 """
 
 # Things needed for single gates
+"""
 ghz = {'0':"HADAMARD1", '1':"CNOT1", '2':"CNOT2", '3':"CNOT3"}
 wstate = {'0':"RY1", '1':"X1", '2':"X2", '3':"CNOT1", '4':"RY2", '5':"CNOT2", '6':"RY3", '7':"X3", '8':"X4", '9':"CNOT3", '10':"CNOT4"}
 adder = {'0':"TOFFOLI1", '1':"TOFFOLI2", '2':"TOFFOLI3", '3':"CNOT1", '4':"CNOT2", '5':"CNOT3"}
@@ -48,6 +49,28 @@ files = [('sim_data/ghz_800fidelities_allgates_.csv', 'ibm_data/ghz100_ibm_sim_f
 circ_names = ['GHZ', 'GHZ', 'WState', 'WState', 'Adder', 'Adder',]
 maps = [ghz, ghz, wstate, wstate, adder, adder]
 metrics = ['fidelities', 'probabilities']*3
+"""
+
+# Last-minute add-on for deutsch-jozsa (whole gate classes )
+"""
+deutsch = {'0':'HADAMARD', '1':'X', '2':'CNOT'}
+files = [('sim_data/deutsch_300fidelities_.csv','ibm_data/deutsch100_ibm_sim_fidelitiesibmq_16_melbourne.csv'),
+        ('sim_data/deutsch_300probabilities_.csv','ibm_data/deutsch100_ibm_sim_probabilities_ibmq_16_melbourne.csv')]
+circ_names = ['Deutsch', 'Deutsch'] 
+maps = [deutsch, deutsch]
+metrics = ['fidelities', 'probabilities']
+"""
+
+# Last minute add-on for deutsch-jozsa (single gates)
+
+deutsch = {'0':'HADAMARD1', '1':'HADAMARD2', '2':'HADAMARD3', '3':'HADAMARD4', '4':'X1', '5':'HADAMARD5', '6':'X2', '7':'X3', '8':'CNOT1', '9':'X4',
+            '10':'CNOT2', '11':'CNOT3', '12':'X5', '13':'CNOT4', '14':'HADAMARD6', '15':'HADAMARD7', '16':'HADAMARD8', '17':'HADAMARD9'}
+files = [('sim_data/deutsch_800fidelities_allgates_.csv','ibm_data/deutsch100_ibm_sim_fidelitiesibmq_16_melbourne.csv'),
+        ('sim_data/deutsch_800probabilities_allgates_.csv','ibm_data/deutsch100_ibm_sim_probabilities_ibmq_16_melbourne.csv')]
+circ_names = ['Deutsch', 'Deutsch'] 
+maps = [deutsch, deutsch]
+metrics = ['fidelities', 'probabilities'] 
+
 
 def handleDataset(filename, split, trainingSet=[], testSet=[]):
     data = []
@@ -225,6 +248,15 @@ Accuracy: 94.74768280123584%
 Predicting Error Classes..
 HADAMARD :  0.0
 CNOT :  1.0
+
+_________________________________________
+Circuit:  Deutsch ; Metric: fidelities
+Accuracy: 69.52554744525547%
+Predicting Error Classes..
+HADAMARD :  1.0
+X :  0.0
+CNOT :  0.0
+
 """
 
 
@@ -297,6 +329,29 @@ TOFFOLI3 :  0.0
 CNOT1 :  0.6868686868686869
 CNOT2 :  0.24242424242424243
 CNOT3 :  0.0707070707070707
+
+_________________________________________
+Circuit:  Deutsch ; Metric: fidelities
+Accuracy: 37.686302342086584%
+Predicting Error Classes..
+HADAMARD1 :  0.0
+HADAMARD2 :  0.0
+HADAMARD3 :  0.0
+HADAMARD4 :  0.0
+X1 :  0.0
+HADAMARD5 :  0.0
+X2 :  0.0
+X3 :  0.0
+CNOT1 :  0.0
+X4 :  0.0
+CNOT2 :  0.0
+CNOT3 :  0.0
+X5 :  0.0
+CNOT4 :  0.0
+HADAMARD6 :  0.20202020202020202
+HADAMARD7 :  0.3434343434343434
+HADAMARD8 :  0.18181818181818182
+HADAMARD9 :  0.2727272727272727
 """
 
 
