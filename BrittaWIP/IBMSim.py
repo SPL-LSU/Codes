@@ -15,8 +15,8 @@ from qiskit.providers.aer.noise.device import models
 from qiskit.extensions import UnitaryGate
 
 
-IBMQ.enable_account("0f09e89596193d3248de3fc64bcc30164e5a563e971effbc1a2c2e121ee61dfddcfb261425d12fb48ab07cb1b6df3299aebe5fc4f1658f5c8604adeaa857a895")
-provider = IBMQ.get_provider()
+IBMQ.enable_account("84fd70bd5cf0a01b623843a1e228a627e78c0c1c6d0f3a0527b1240c702630ee36bb2b71c85c2c8148011dfbc3a4400520836eaf69d5c91d87e5a9ccb3f85f75")
+provider = IBMQ.get_provider(hub='ibm-q', group='open', project='main')
 simulator = Aer.get_backend('qasm_simulator')
 
 def initialize_circuit(qubits):
@@ -82,6 +82,61 @@ def GHZ_circuit(qc, choice):
 
         qc.measure(0, 0)
 
+def deutsch_jozsa_circuit(qc, choice):
+
+    if choice == 'probabilities':
+
+        qc.h(0)
+        qc.h(1)
+        qc.h(2)
+        qc.h(3)
+        qc.x(4)
+        qc.h(4)
+        qc.x(0)
+        qc.x(2)
+        qc.cx(0, 4)
+        qc.x(0)
+        qc.cx(1, 4)
+        qc.cx(2, 4)
+        qc.x(2)
+        qc.cx(3, 4)
+        qc.h(0)
+        qc.h(1)
+        qc.h(2)
+        qc.h(3)
+        for x in range(5):
+            qc.measure(x, x)
+
+    elif choice == 'fidelities':
+        qubits = 5
+        qc.h(1)
+        qc.h(2)
+        qc.h(3)
+        qc.h(4)
+        qc.x(5)
+        qc.h(5)
+        qc.x(1)
+        qc.x(3)
+        qc.cx(1, 5)
+        qc.x(1)
+        qc.cx(2, 5)
+        qc.cx(3, 5)
+        qc.x(3)
+        qc.cx(4, 5)
+        qc.h(1)
+        qc.h(2)
+        qc.h(3)
+        qc.h(4)
+
+        # swap test
+        qc.h(0)
+        for x in range(1, qubits + 1):
+            qc.barrier()
+            fredkin3(qc, 0, x, x + qubits)
+            qc.barrier()
+        qc.h(0)
+
+        qc.measure(0, 0)
 
 def teleportation_circuit(qc, choice):
 
@@ -307,14 +362,14 @@ def write_data(save_path, vectors):
     csvFile.close()
 
 # lists needed for data gathering
-circs, circ_qubits = ['teleport', 'wstate', 'ghz', 'repeater', 'adder'], [3, 3, 4, 4, 5]
-circ_algs = [teleportation_circuit, wstate_circuit, GHZ_circuit, repeater_circuit, one_qubit_adder_circuit]
+circs, circ_qubits = ['teleport', 'wstate', 'ghz', 'repeater', 'adder', 'deutsch'], [3, 3, 4, 4, 5, 5]
+circ_algs = [teleportation_circuit, wstate_circuit, GHZ_circuit, repeater_circuit, one_qubit_adder_circuit, deutsch_jozsa_circuit]
 
 
 def probabilities_test_data(pop):
 
     # initialize chosen circuit, find variables and noise model parameters
-    circ = str(input('Which circuit? (teleport, wstate, ghz, repeater, adder)'))
+    circ = str(input('Which circuit? (teleport, wstate, ghz, repeater, adder, deutsch)'))
     qubits = int(circ_qubits[circs.index(circ)])
     dev_name = 'ibmq_16_melbourne' # put in choice
     device, noise_model, basis_gates, coupling_map = gate_error_noise_model(dev_name)
@@ -322,7 +377,7 @@ def probabilities_test_data(pop):
 
     for x in range(pop):
         # obtain a noisy counts vector
-        algorithm = circ_algs[circs.index(circ)]
+        algorithm = circ_algs[circs.index(circ)] # CHANGE BACK ALL SHOTS
         circuit = initialize_circuit(qubits)
         algorithm(circuit, 'probabilities')
         result = execute(circuit, backend=simulator, shots=1024, noise_model=noise_model,
@@ -343,7 +398,7 @@ def probabilities_test_data(pop):
 def fidelities_test_data(pop):
 
     # initialize chosen circuit, find variables and noise model parameters
-    circ = str(input('Which circuit? (teleport, wstate, ghz, repeater, adder)'))
+    circ = str(input('Which circuit? (teleport, wstate, ghz, repeater, adder, deutsch)'))
     qubits = int(circ_qubits[circs.index(circ)])
     dev_name = 'ibmq_16_melbourne'
     device, noise_model, basis_gates, coupling_map = gate_error_noise_model(dev_name)
