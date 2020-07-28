@@ -235,6 +235,21 @@ def one_qubit_adder():
     return qubits, circuit, inds, tags, classes
 
 
+def deutsch_jozsa_circuit():
+
+    qubits = 5
+    inds = [0, 1, 2, 3, 4, 4, 0, 2, (0, 4), 0, (1, 4), (2, 4), 2, (3, 4), 0, 1, 2, 3]
+    algs, alg_tags = [hadamaker, paulix, cnot], ['HADAMARD', 'X', 'CNOT']
+    classes = ['HADAMARD', 'X', 'CNOT']
+    tags = ['HADAMARD', 'HADAMARD', 'HADAMARD', 'HADAMARD', 'X', 'HADAMARD', 'X', 'X', 'CNOT', 'X',
+            'CNOT', 'CNOT', 'X', 'CNOT', 'HADAMARD', 'HADAMARD', 'HADAMARD', 'HADAMARD']
+    dex, circuit = 0, []
+    for x in tags:
+        circuit.append(algs[alg_tags.index(x)](inds[dex], None, False, qubits))
+        dex += 1
+
+    return qubits, circuit, inds, tags, classes
+
 # Utility Functions ===============================================================#
 
 
@@ -355,6 +370,13 @@ def gather_probabilities_data(pop, circuit, tags, indices, qubits, loc, classes)
     alt_algs = [hadamaker, cnot, paulix, ry_gate, conv_cz, toffoli]
     check_dups, vecs = [], []
 
+
+    # find the ideal vector for comparison
+    last_start = get_starting_state(qubits, 'probabilities', None)
+    ideal_vec = apply_circuit(last_start, circuit).T.tolist()
+    ideal_vec = np.real(np.conj(ideal_vec) * np.array(ideal_vec))
+    print("Ideal: ", ideal_vec.tolist()[0])
+
     for run in range(pop):
         # run through an error on each individual gate
         ry_dex = 1
@@ -384,11 +406,6 @@ def gather_probabilities_data(pop, circuit, tags, indices, qubits, loc, classes)
                 print(new_data_vec)
                 write_data(new_data_vec, loc)
 
-    # find the ideal vector for comparison
-    last_start = get_starting_state(qubits, 'probabilities', None)
-    ideal_vec = apply_circuit(last_start, circuit).T.tolist()
-    ideal_vec = np.real(np.conj(ideal_vec) * np.array(ideal_vec))
-    print("Ideal: ", ideal_vec.tolist()[0])
     return vecs
 
 
@@ -400,6 +417,18 @@ def diagnostic_fidelity_circuit(pop, circuit, tags, indices, qubits, loc, classe
     gate_types = ["HADAMARD", "CNOT", "X", "RY", "CZ", "TOFFOLI"]
     alt_algs = [hadamaker, cnot, paulix, ry_gate, conv_cz, toffoli]
     check_dups, vecs = [], []
+
+
+    # find ideal vector for comparison
+    ideal_vector = []
+    for i in range(4):
+        psi0 = get_starting_state(qubits, 'fidelities', i)
+        reference = psi0.copy()
+        state_fin = apply_circuit(psi0, circuit)
+        distance = dis(state_fin, reference, 2 ** qubits)
+        ideal_vector.append(list(distance)[0])
+    print("Ideal: ", ideal_vector)
+
 
     for run in range(pop):
         # run through an error on each individual gate
@@ -433,25 +462,16 @@ def diagnostic_fidelity_circuit(pop, circuit, tags, indices, qubits, loc, classe
                 print(new_data_vec)
                 write_data(new_data_vec, loc)
 
-    # find ideal vector for comparison
-    ideal_vector = []
-    for i in range(4):
-        psi0 = get_starting_state(qubits, 'fidelities', i)
-        reference = psi0.copy()
-        state_fin = apply_circuit(psi0, circuit)
-        distance = dis(state_fin, reference, 2 ** qubits)
-        ideal_vector.append(list(distance)[0])
-    print("Ideal: ", ideal_vector)
 
     return vecs
 
 
 def main():
 
-    circ_algs = [teleportation_circuit, w_state_circuit, ghz_circuit, repeater_circuit, one_qubit_adder]
-    circs = ['teleport', 'wstate', 'ghz', 'repeater', 'adder']
+    circ_algs = [teleportation_circuit, w_state_circuit, ghz_circuit, repeater_circuit, one_qubit_adder, deutsch_jozsa_circuit]
+    circs = ['teleport', 'wstate', 'ghz', 'repeater', 'adder', 'deutsch']
     # Ask many questions
-    circ_choice = str(input('Which circuit? (teleport, wstate, ghz, repeater, adder)'))
+    circ_choice = str(input('Which circuit? (teleport, wstate, ghz, repeater, adder, deutsch)'))
     metric_choice = str(input('Which metric are you using? (probabilities, fidelities)'))
     pop = int(input('How many errors per gate?'))
     loc = circ_choice + '_' + str(pop) + metric_choice + '_.csv'
