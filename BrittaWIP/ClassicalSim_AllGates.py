@@ -236,6 +236,24 @@ def one_qubit_adder():
     return qubits, circuit, inds, tags, classes
 
 
+def deutsch_jozsa_circuit():
+
+    qubits = 5
+    inds = [0, 1, 2, 3, 4, 4, 0, 2, (0, 4), 0, (1, 4), (2, 4), 2, (3, 4), 0, 1, 2, 3]
+    algs, alg_tags = [hadamaker, paulix, cnot], ['HADAMARD', 'X', 'CNOT']
+    classes = ['HADAMARD', 'X', 'CNOT']
+    tags = ['HADAMARD1', 'HADAMARD2', 'HADAMARD3', 'HADAMARD4', 'X1', 'HADAMARD5', 'X2', 'X3', 'CNOT1', 'X4',
+            'CNOT2', 'CNOT3', 'X5', 'CNOT4', 'HADAMARD6', 'HADAMARD7', 'HADAMARD8', 'HADAMARD9']
+    type_tags = ['HADAMARD', 'HADAMARD', 'HADAMARD', 'HADAMARD', 'X', 'HADAMARD', 'X', 'X', 'CNOT', 'X',
+            'CNOT', 'CNOT', 'X', 'CNOT', 'HADAMARD', 'HADAMARD', 'HADAMARD', 'HADAMARD']
+    dex, circuit = 0, []
+    for x in type_tags:
+        circuit.append(algs[alg_tags.index(x)](inds[dex], None, False, qubits))
+        dex += 1
+
+    return qubits, circuit, inds, tags, classes
+
+
 # Utility Functions ===============================================================#
 
 
@@ -457,10 +475,10 @@ def diagnostic_fidelity_circuit(pop, circuit, tags, indices, qubits, loc, classe
 
 def main():
 
-    circ_algs = [teleportation_circuit, w_state_circuit, ghz_circuit, repeater_circuit, one_qubit_adder]
-    circs = ['teleport', 'wstate', 'ghz', 'repeater', 'adder']
+    circ_algs = [teleportation_circuit, w_state_circuit, ghz_circuit, repeater_circuit, one_qubit_adder, deutsch_jozsa_circuit]
+    circs = ['teleport', 'wstate', 'ghz', 'repeater', 'adder', 'deutsch']
     # Ask many questions
-    circ_choice = str(input('Which circuit? (teleport, wstate, ghz, repeater, adder)'))
+    circ_choice = str(input('Which circuit? (teleport, wstate, ghz, repeater, adder, deutsch)'))
     metric_choice = str(input('Which metric are you using? (probabilities, fidelities)'))
     pop = int(input('How many errors per gate?'))
     loc = circ_choice + '_' + str(pop) + metric_choice + '_allgates' + '_.csv'
